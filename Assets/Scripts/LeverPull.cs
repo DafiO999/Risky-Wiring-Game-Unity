@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -38,6 +39,12 @@ public sealed class LeverPull : MonoBehaviour
 
     public bool IsMoving => state != LeverState.Idle;
 
+    /// <summary>
+    /// Raised once when a new pull starts. Systems such as the slot cylinders can
+    /// subscribe without being coupled to this lever's click handling.
+    /// </summary>
+    public event Action Pulled;
+
     private void Awake()
     {
         restingLocalRotation = transform.localRotation;
@@ -67,8 +74,11 @@ public sealed class LeverPull : MonoBehaviour
     /// </summary>
     public void Pull()
     {
-        if (state == LeverState.Idle)
-            state = LeverState.Pulling;
+        if (state != LeverState.Idle)
+            return;
+
+        state = LeverState.Pulling;
+        Pulled?.Invoke();
     }
 
     private void CheckForClick()
