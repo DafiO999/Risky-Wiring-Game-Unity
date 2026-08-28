@@ -1,14 +1,29 @@
 using UnityEditor;
 using UnityEngine;
 
-[CustomEditor(typeof(BoardComponent))]
+[CustomEditor(typeof(BoardComponent), true)]
 public sealed class BoardComponentEditor : Editor
 {
     private string lastFailureReason;
+    private SerializedProperty portsProperty;
+    private SerializedProperty drawPortGizmosProperty;
+    private SerializedProperty portGizmoSizeProperty;
+    private SerializedProperty inputPortColorProperty;
+    private SerializedProperty outputPortColorProperty;
+
+    private void OnEnable()
+    {
+        portsProperty = serializedObject.FindProperty("ports");
+        drawPortGizmosProperty = serializedObject.FindProperty("drawPortGizmos");
+        portGizmoSizeProperty = serializedObject.FindProperty("portGizmoSize");
+        inputPortColorProperty = serializedObject.FindProperty("inputPortColor");
+        outputPortColorProperty = serializedObject.FindProperty("outputPortColor");
+    }
 
     public override void OnInspectorGUI()
     {
         BoardComponent component = (BoardComponent)target;
+        serializedObject.Update();
 
         using (new EditorGUI.DisabledScope(true))
         {
@@ -47,6 +62,56 @@ public sealed class BoardComponentEditor : Editor
         }
 
         DrawPlacementStatus(component);
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Ports", EditorStyles.boldLabel);
+        using (new EditorGUI.DisabledScope(component.GetType() != typeof(BoardComponent)))
+            EditorGUILayout.PropertyField(portsProperty, true);
+
+        if (component is ScoredPowerConsumerComponent consumer)
+        {
+            SerializedProperty scoreSystemProperty =
+                serializedObject.FindProperty("scoreSystem");
+            if (scoreSystemProperty != null)
+                EditorGUILayout.PropertyField(scoreSystemProperty);
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Power Debug", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Received Power", consumer.ReceivedPower.ToString());
+            EditorGUILayout.LabelField("Score / Second", consumer.ScorePerSecond.ToString());
+        }
+
+        if (component is BatteryComponent battery)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Battery", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("capacity"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("charge"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("outputPower"));
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Power Debug", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "Received Input Power",
+                battery.ReceivedInputPower.ToString());
+            EditorGUILayout.LabelField(
+                "Provided Output Power",
+                battery.ProvidedOutputPower.ToString());
+        }
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Port Debug", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(drawPortGizmosProperty);
+        EditorGUILayout.PropertyField(portGizmoSizeProperty);
+        EditorGUILayout.PropertyField(inputPortColorProperty);
+        EditorGUILayout.PropertyField(outputPortColorProperty);
+
+        if (serializedObject.ApplyModifiedProperties())
+        {
+            component.ValidatePortConfiguration();
+            EditorUtility.SetDirty(component);
+            SceneView.RepaintAll();
+        }
     }
 
     private void ApplyPlacement(

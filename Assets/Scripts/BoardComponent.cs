@@ -11,7 +11,7 @@ public enum BoardRotation
 
 [DisallowMultipleComponent]
 [ExecuteAlways]
-public sealed class BoardComponent : MonoBehaviour
+public class BoardComponent : MonoBehaviour
 {
     public const int FootprintWidth = 2;
     public const int FootprintHeight = 2;
@@ -27,6 +27,22 @@ public sealed class BoardComponent : MonoBehaviour
     [SerializeField, HideInInspector]
     private BoardRotation rotation;
 
+    [SerializeField]
+    private List<BoardPort> ports = new();
+
+    [SerializeField]
+    private bool drawPortGizmos = true;
+
+    [SerializeField, Range(0.02f, 0.4f)]
+    [Tooltip("Port marker radius as a fraction of the board's cell size.")]
+    private float portGizmoSize = 0.12f;
+
+    [SerializeField]
+    private Color inputPortColor = new(0.1f, 0.85f, 1f, 1f);
+
+    [SerializeField]
+    private Color outputPortColor = new(1f, 0.45f, 0.05f, 1f);
+
     private bool isPlaced;
     private bool isApplyingPlacement;
 
@@ -36,6 +52,7 @@ public sealed class BoardComponent : MonoBehaviour
     public int RotationSteps => (int)rotation;
     public int RotationDegrees => RotationSteps * 90;
     public bool IsPlaced => isPlaced;
+    public IReadOnlyList<BoardPort> Ports => ports;
 
     public IEnumerable<Vector2Int> OccupiedCells
     {
@@ -49,7 +66,7 @@ public sealed class BoardComponent : MonoBehaviour
         }
     }
 
-    private void Reset()
+    protected virtual void Reset()
     {
         board = FindBoardForTransform();
         rotation = BoardRotation.Degrees0;
@@ -61,7 +78,7 @@ public sealed class BoardComponent : MonoBehaviour
         board.TryPlaceComponent(this, gridPosition, RotationSteps);
     }
 
-    private void OnEnable()
+    protected virtual void OnEnable()
     {
         if (isApplyingPlacement)
             return;
@@ -73,18 +90,23 @@ public sealed class BoardComponent : MonoBehaviour
             board.TryPlaceComponent(this, gridPosition, RotationSteps);
     }
 
-    private void OnValidate()
+    protected virtual void OnValidate()
     {
         rotation = (BoardRotation)GridBoard.NormalizeRotationSteps((int)rotation);
+        portGizmoSize = Mathf.Clamp(portGizmoSize, 0.02f, 0.4f);
+        ValidatePortConfiguration();
+
+        if (board != null && isPlaced)
+            board.RefreshWireConnections();
     }
 
-    private void OnTransformParentChanged()
+    protected virtual void OnTransformParentChanged()
     {
         if (!isApplyingPlacement && isActiveAndEnabled && board != null)
             board.TryPlaceComponent(this, gridPosition, RotationSteps);
     }
 
-    private void OnDestroy()
+    protected virtual void OnDestroy()
     {
         if (board != null)
             board.RemoveComponent(this);
@@ -131,6 +153,106 @@ public sealed class BoardComponent : MonoBehaviour
         isPlaced = false;
     }
 
+    /// <summary>
+    /// Returns a port's rotated board cell and cardinal direction.
+    /// </summary>
+    public bool TryGetPortGridPose(
+        int portIndex,
+        out Vector2Int cell,
+        out BoardPortDirection direction)
+    {
+        if (ports == null || portIndex < 0 || portIndex >= ports.Count || ports[portIndex] == null)
+        {
+            cell = default;
+            direction = default;
+            return false;
+        }
+
+        BoardPort port = ports[portIndex];
+        Vector2Int rotatedOffset = port.GetRotatedCellOffset(RotationSteps, FootprintSize);
+        cell = gridPosition + rotatedOffset;
+        direction = port.GetRotatedDirection(RotationSteps);
+        return true;
+    }
+
+    /// <summary>
+    /// Finds the port configured on one outward-facing edge of the placed footprint.
+    /// The lookup uses only rotated logical cell coordinates and cardinal direction.
+    /// </summary>
+    public bool TryGetPortAtGridEdge(
+        Vector2Int cell,
+        BoardPortDirection direction,
+        out BoardPort port)
+    {
+        if (ports != null)
+        {
+            for (int portIndex = 0; portIndex < ports.Count; portIndex++)
+            {
+                BoardPort candidate = ports[portIndex];
+                if (candidate != null &&
+                    TryGetPortGridPose(
+                        portIndex,
+                        out Vector2Int candidateCell,
+                        out BoardPortDirection candidateDirection) &&
+                    candidateCell == cell &&
+                    candidateDirection == direction)
+                {
+                    port = candidate;
+                    return true;
+                }
+            }
+        }
+
+        port = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Returns the world position on the owning cell edge and the outward world direction.
+    /// </summary>
+    public bool TryGetPortWorldPose(
+        int portIndex,
+        out Vector3 worldPosition,
+        out Vector3 worldDirection)
+    {
+        if (board == null ||
+            !isPlaced ||
+            !TryGetPortGridPose(portIndex, out Vector2Int cell, out BoardPortDirection direction))
+        {
+            worldPosition = default;
+            worldDirection = default;
+            return false;
+        }
+
+        Vector2Int directionOffset = BoardPort.DirectionToCellOffset(direction);
+        Vector3 localDirection = new(directionOffset.x, 0f, directionOffset.y);
+        Vector3 localEdgeOffset = localDirection * (board.CellSize * 0.5f);
+
+        worldPosition = board.CellToWorld(cell) +
+                        board.transform.TransformVector(localEdgeOffset);
+        worldDirection = board.transform.TransformDirection(localDirection).normalized;
+        return true;
+    }
+
+    /// <summary>
+    /// Clamps every local port offset to this component's 2x2 footprint.
+    /// </summary>
+    public void ValidatePortConfiguration()
+    {
+        ports ??= new List<BoardPort>();
+
+        foreach (BoardPort port in ports)
+            port?.Validate(FootprintSize);
+    }
+
+    protected void ReplacePorts(params BoardPort[] configuredPorts)
+    {
+        ports = configuredPorts != null
+            ? new List<BoardPort>(configuredPorts)
+            : new List<BoardPort>();
+        ValidatePortConfiguration();
+    }
+
     internal void ApplyPlacementFromBoard(
         GridBoard owner,
         Vector2Int targetGridPosition,
@@ -158,6 +280,61 @@ public sealed class BoardComponent : MonoBehaviour
     internal void SetPlacementValidity(bool value)
     {
         isPlaced = value;
+    }
+
+    protected virtual void OnDrawGizmos()
+    {
+        if (!drawPortGizmos || ports == null || board == null || !isPlaced)
+            return;
+
+        float rightCellSize = board.transform
+            .TransformVector(Vector3.right * board.CellSize)
+            .magnitude;
+        float forwardCellSize = board.transform
+            .TransformVector(Vector3.forward * board.CellSize)
+            .magnitude;
+        float worldCellSize = Mathf.Min(rightCellSize, forwardCellSize);
+        float markerRadius = Mathf.Max(0.01f, worldCellSize * portGizmoSize);
+        Vector3 boardNormal = board.transform.up.normalized;
+        Color previousColor = Gizmos.color;
+
+        for (int portIndex = 0; portIndex < ports.Count; portIndex++)
+        {
+            if (!TryGetPortWorldPose(
+                    portIndex,
+                    out Vector3 portPosition,
+                    out Vector3 portDirection))
+            {
+                continue;
+            }
+
+            BoardPort port = ports[portIndex];
+            Vector3 markerPosition = portPosition + boardNormal * markerRadius * 0.2f;
+            Gizmos.color = port.Type == BoardPortType.Input
+                ? inputPortColor
+                : outputPortColor;
+
+            Gizmos.DrawSphere(markerPosition, markerRadius);
+            DrawDirectionArrow(markerPosition, portDirection, boardNormal, markerRadius);
+        }
+
+        Gizmos.color = previousColor;
+    }
+
+    private static void DrawDirectionArrow(
+        Vector3 start,
+        Vector3 direction,
+        Vector3 boardNormal,
+        float markerRadius)
+    {
+        float arrowLength = markerRadius * 3f;
+        Vector3 tip = start + direction * arrowLength;
+        Vector3 side = Vector3.Cross(boardNormal, direction).normalized;
+        Vector3 arrowBase = tip - direction * markerRadius;
+
+        Gizmos.DrawLine(start, tip);
+        Gizmos.DrawLine(tip, arrowBase + side * markerRadius * 0.65f);
+        Gizmos.DrawLine(tip, arrowBase - side * markerRadius * 0.65f);
     }
 
     private GridBoard FindBoardForTransform()
