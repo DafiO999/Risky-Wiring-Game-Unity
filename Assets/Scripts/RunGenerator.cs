@@ -165,19 +165,12 @@ public sealed class RunGenerator : MonoBehaviour
 
         System.Random random = new(runSeed);
         RunComponentCounts requestedCounts = RollComponentCounts(difficulty, random);
-        lastGeneratedCounts = requestedCounts;
-        if (requestedCounts.Total > targetBoard.CellCount / 4)
-        {
-            ClearBoard();
-            return Fail(
-                $"Difficulty {difficulty} requests {requestedCounts.Total} components, " +
-                $"but the {targetBoard.Width}x{targetBoard.Height} board can fit at most " +
-                $"{targetBoard.CellCount / 4} non-overlapping 2x2 footprints.",
-                true);
-        }
+        lastGeneratedCounts = default;
 
         ClearBoard();
-        BuildComponentKindList(requestedCounts);
+        BuildComponentKindList(
+            requestedCounts,
+            targetBoard.CellCount / 4);
 
         for (int boardAttempt = 0;
              boardAttempt < boardRegenerationAttempts;
@@ -186,7 +179,6 @@ public sealed class RunGenerator : MonoBehaviour
             DestroyGeneratedComponents();
             reservedPortCells.Clear();
 
-            bool placedEveryComponent = true;
             for (int componentIndex = 0;
                  componentIndex < componentKinds.Count;
                  componentIndex++)
@@ -198,48 +190,45 @@ public sealed class RunGenerator : MonoBehaviour
                     targetBoard.EnsureComponentsRoot());
                 if (component == null)
                 {
-                    placedEveryComponent = false;
-                    break;
+                    DestroyGeneratedComponents();
+                    reservedPortCells.Clear();
+                    return Fail(
+                        string.IsNullOrEmpty(lastFailureReason)
+                            ? $"Could not create {kind}."
+                            : lastFailureReason,
+                        true);
                 }
 
-                generatedComponents.Add(component);
                 if (!TryPlaceComponent(component, targetBoard, random))
                 {
-                    lastFailureReason =
-                        $"Could not place {kind} after checking up to " +
-                        $"{placementAttemptsPerComponent} candidates " +
-                        $"(layout attempt {boardAttempt + 1}/{boardRegenerationAttempts}).";
-                    placedEveryComponent = false;
-                    break;
-                }
-            }
-
-            if (placedEveryComponent)
-            {
-                if (!ValidateConsumerReachability(
-                        targetBoard,
-                        out string reachabilityFailureReason))
-                {
-                    lastFailureReason =
-                        $"{reachabilityFailureReason} " +
-                        $"(layout attempt {boardAttempt + 1}/" +
-                        $"{boardRegenerationAttempts}).";
+                    DestroyComponentObject(component);
                     continue;
                 }
 
-                lastFailureReason = string.Empty;
-                return true;
+                generatedComponents.Add(component);
             }
+
+            if (ValidateConsumerReachability(
+                    targetBoard,
+                    out string reachabilityFailureReason))
+            {
+                return CompleteGeneration(requestedCounts);
+            }
+
+            lastFailureReason =
+                $"{reachabilityFailureReason} " +
+                $"(layout attempt {boardAttempt + 1}/" +
+                $"{boardRegenerationAttempts}).";
+
+            if (boardAttempt + 1 < boardRegenerationAttempts)
+                continue;
+
+            RemoveUnreachableConsumers(targetBoard);
+            RebuildReservedPortCells(targetBoard);
+            return CompleteGeneration(requestedCounts);
         }
 
-        DestroyGeneratedComponents();
-        reservedPortCells.Clear();
-        return Fail(
-            string.IsNullOrEmpty(lastFailureReason)
-                ? $"Failed to generate difficulty {difficulty} after " +
-                  $"{boardRegenerationAttempts} complete layout attempts."
-                : lastFailureReason,
-            true);
+        return CompleteGeneration(requestedCounts);
     }
 
     public RunComponentCounts PreviewCounts(int targetDifficulty, int runSeed)
@@ -379,6 +368,34 @@ public sealed class RunGenerator : MonoBehaviour
         GridBoard targetBoard,
         out string failureReason)
     {
+        HashSet<Vector2Int> reachableCells =
+            BuildGeneratorReachableCells(targetBoard);
+
+        foreach (BoardComponent component in generatedComponents)
+        {
+            if (component is not ScoredPowerConsumerComponent ||
+                !component.IsPlaced ||
+                AreAllConsumerInputsReachable(
+                    component,
+                    targetBoard,
+                    reachableCells))
+            {
+                continue;
+            }
+
+            failureReason =
+                $"{component.name} input port has no empty-cell route " +
+                "to a generator output";
+            return false;
+        }
+
+        failureReason = string.Empty;
+        return true;
+    }
+
+    private HashSet<Vector2Int> BuildGeneratorReachableCells(
+        GridBoard targetBoard)
+    {
         HashSet<Vector2Int> reachableCells = new();
         Queue<Vector2Int> frontier = new();
 
@@ -423,37 +440,79 @@ public sealed class RunGenerator : MonoBehaviour
             }
         }
 
-        foreach (BoardComponent component in generatedComponents)
+        return reachableCells;
+    }
+
+    private static bool AreAllConsumerInputsReachable(
+        BoardComponent component,
+        GridBoard targetBoard,
+        HashSet<Vector2Int> reachableCells)
+    {
+        for (int portIndex = 0; portIndex < component.Ports.Count; portIndex++)
         {
+            BoardPort port = component.Ports[portIndex];
+            if (port == null || port.Type != BoardPortType.Input)
+                continue;
+
+            if (!TryGetEmptyCellOutsidePort(
+                    component,
+                    portIndex,
+                    targetBoard,
+                    out Vector2Int outsideCell) ||
+                !reachableCells.Contains(outsideCell))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void RemoveUnreachableConsumers(GridBoard targetBoard)
+    {
+        HashSet<Vector2Int> reachableCells =
+            BuildGeneratorReachableCells(targetBoard);
+
+        for (int componentIndex = generatedComponents.Count - 1;
+             componentIndex >= 0;
+             componentIndex--)
+        {
+            BoardComponent component = generatedComponents[componentIndex];
             if (component is not ScoredPowerConsumerComponent ||
-                !component.IsPlaced)
+                AreAllConsumerInputsReachable(
+                    component,
+                    targetBoard,
+                    reachableCells))
             {
                 continue;
             }
 
+            generatedComponents.RemoveAt(componentIndex);
+            DestroyComponentObject(component);
+        }
+    }
+
+    private void RebuildReservedPortCells(GridBoard targetBoard)
+    {
+        reservedPortCells.Clear();
+
+        foreach (BoardComponent component in generatedComponents)
+        {
+            if (component == null || !component.IsPlaced)
+                continue;
+
             for (int portIndex = 0; portIndex < component.Ports.Count; portIndex++)
             {
-                BoardPort port = component.Ports[portIndex];
-                if (port == null || port.Type != BoardPortType.Input)
-                    continue;
-
-                if (!TryGetEmptyCellOutsidePort(
+                if (TryGetEmptyCellOutsidePort(
                         component,
                         portIndex,
                         targetBoard,
-                        out Vector2Int outsideCell) ||
-                    !reachableCells.Contains(outsideCell))
+                        out Vector2Int outsideCell))
                 {
-                    failureReason =
-                        $"{component.name} input port has no empty-cell route " +
-                        "to a generator output";
-                    return false;
+                    reservedPortCells.Add(outsideCell);
                 }
             }
         }
-
-        failureReason = string.Empty;
-        return true;
     }
 
     private static bool TryGetEmptyCellOutsidePort(
@@ -498,19 +557,77 @@ public sealed class RunGenerator : MonoBehaviour
         }
     }
 
-    private void BuildComponentKindList(RunComponentCounts counts)
+    private void BuildComponentKindList(
+        RunComponentCounts counts,
+        int maximumComponentCount)
     {
         componentKinds.Clear();
-        AddKinds(ComponentKind.Generator, counts.generators);
-        AddKinds(ComponentKind.Battery, counts.batteries);
-        AddKinds(ComponentKind.Lamp, counts.lamps);
-        AddKinds(ComponentKind.Fan, counts.fans);
+        AddKinds(ComponentKind.Generator, counts.generators, maximumComponentCount);
+        AddKinds(ComponentKind.Battery, counts.batteries, maximumComponentCount);
+        AddKinds(ComponentKind.Lamp, counts.lamps, maximumComponentCount);
+        AddKinds(ComponentKind.Fan, counts.fans, maximumComponentCount);
     }
 
-    private void AddKinds(ComponentKind kind, int count)
+    private void AddKinds(
+        ComponentKind kind,
+        int count,
+        int maximumComponentCount)
     {
-        for (int index = 0; index < count; index++)
+        int remainingCapacity = Mathf.Max(
+            0,
+            maximumComponentCount - componentKinds.Count);
+        int amountToAdd = Mathf.Min(count, remainingCapacity);
+        for (int index = 0; index < amountToAdd; index++)
             componentKinds.Add(kind);
+    }
+
+    private bool CompleteGeneration(RunComponentCounts requestedCounts)
+    {
+        lastGeneratedCounts = CountGeneratedComponents();
+        int skippedCount = Mathf.Max(
+            0,
+            requestedCounts.Total - lastGeneratedCounts.Total);
+
+        lastFailureReason = string.Empty;
+        if (skippedCount > 0)
+        {
+            Debug.LogWarning(
+                $"Generated difficulty {difficulty} with " +
+                $"{lastGeneratedCounts.Total}/{requestedCounts.Total} components. " +
+                $"Skipped {skippedCount} component(s) that could not be placed safely.",
+                this);
+        }
+
+        return true;
+    }
+
+    private RunComponentCounts CountGeneratedComponents()
+    {
+        int generators = 0;
+        int batteries = 0;
+        int lamps = 0;
+        int fans = 0;
+
+        foreach (BoardComponent component in generatedComponents)
+        {
+            switch (component)
+            {
+                case GeneratorComponent:
+                    generators++;
+                    break;
+                case BatteryComponent:
+                    batteries++;
+                    break;
+                case LampComponent:
+                    lamps++;
+                    break;
+                case FanComponent:
+                    fans++;
+                    break;
+            }
+        }
+
+        return new RunComponentCounts(generators, batteries, lamps, fans);
     }
 
     private RunComponentCounts RollComponentCounts(

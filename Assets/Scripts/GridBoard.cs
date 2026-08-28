@@ -224,6 +224,38 @@ public sealed class GridBoard : MonoBehaviour
     }
 
     /// <summary>
+    /// Resizes the board to a square grid at runtime.
+    /// </summary>
+    public void SetSize(int size)
+    {
+        SetSize(size, size);
+    }
+
+    /// <summary>
+    /// Resizes the logical grid and refreshes its runtime storage and views.
+    /// Existing content should be cleared before shrinking the board.
+    /// </summary>
+    public void SetSize(int newWidth, int newHeight)
+    {
+        newWidth = Mathf.Max(1, newWidth);
+        newHeight = Mathf.Max(1, newHeight);
+
+        if (width == newWidth && height == newHeight)
+            return;
+
+        width = newWidth;
+        height = newHeight;
+        occupancyDirty = true;
+        wireViewsDirty = true;
+
+        RebuildCells();
+        EnsureWireStorage();
+        EnsureOccupancy();
+        RefreshWireViews();
+        NotifyTopologyChanged();
+    }
+
+    /// <summary>
     /// Gets the coordinate stored at a logical grid index.
     /// </summary>
     public Vector2Int GetCell(int x, int y)

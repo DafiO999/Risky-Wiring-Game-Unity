@@ -8,16 +8,21 @@ public sealed class RunManager : MonoBehaviour
     private RunSettings settings = new();
 
     [SerializeField]
-    [Tooltip("Start the inspector-configured run when play mode begins.")]
-    private bool startAutomatically = true;
+    [Tooltip("Start an inspector-configured run when play mode begins. Slot-driven games should leave this off.")]
+    private bool startAutomatically;
 
     [Header("Systems")]
+    [SerializeField]
+    [Tooltip("Slot machine whose grid size, difficulty, and time start each game.")]
+    private SlotMachineController slotMachine;
+
     [SerializeField]
     private RunGenerator runGenerator;
 
     [SerializeField]
     private ScoreSystem scoreSystem;
 
+    private SlotMachineController subscribedSlotMachine;
     private bool isRunning;
     private float remainingTime;
     private string lastStartFailureReason;
@@ -36,9 +41,15 @@ public sealed class RunManager : MonoBehaviour
     private void Reset()
     {
         settings = new RunSettings();
-        startAutomatically = true;
+        startAutomatically = false;
+        slotMachine = FindFirstObjectByType<SlotMachineController>();
         runGenerator = GetComponent<RunGenerator>();
         scoreSystem = GetComponent<ScoreSystem>();
+    }
+
+    private void OnEnable()
+    {
+        BindSlotMachine();
     }
 
     private void OnValidate()
@@ -49,6 +60,8 @@ public sealed class RunManager : MonoBehaviour
 
     private void Start()
     {
+        BindSlotMachine();
+
         if (startAutomatically)
             StartRun();
     }
@@ -60,22 +73,44 @@ public sealed class RunManager : MonoBehaviour
 
     private void OnDisable()
     {
+        UnbindSlotMachine();
+
         if (isRunning)
             EndRun();
     }
 
+    /// <summary>
+    /// Starts a run from the inspector settings with a newly generated seed.
+    /// </summary>
     public bool StartRun()
     {
         RunSettings currentSettings = ResolveSettings();
         return StartRun(
+            currentSettings.GridSize,
             currentSettings.Difficulty,
-            currentSettings.Duration,
-            currentSettings.Seed);
+            currentSettings.Duration);
     }
 
-    public bool StartRun(int difficulty, float duration, int seed)
+    /// <summary>
+    /// Applies the three slot results and starts a run with a newly generated seed.
+    /// </summary>
+    public bool StartRun(int gridSize, int difficulty, float duration)
+    {
+        return StartRunInternal(
+            gridSize,
+            difficulty,
+            duration,
+            GenerateRandomSeed());
+    }
+
+    private bool StartRunInternal(
+        int gridSize,
+        int difficulty,
+        float duration,
+        int seed)
     {
         RunSettings currentSettings = ResolveSettings();
+        currentSettings.GridSize = gridSize;
         currentSettings.Difficulty = difficulty;
         currentSettings.Duration = duration;
         currentSettings.Seed = seed;
@@ -94,7 +129,13 @@ public sealed class RunManager : MonoBehaviour
         if (targetScoreSystem == null)
             return FailStart("RunManager requires a ScoreSystem.");
 
+        GridBoard targetBoard = targetGenerator.Board;
+        if (targetBoard == null)
+            return FailStart("RunManager requires a GridBoard through its RunGenerator.");
+
         targetScoreSystem.ResetScore();
+        targetGenerator.ClearBoard();
+        targetBoard.SetSize(currentSettings.GridSize);
 
         if (!targetGenerator.Generate(
                 currentSettings.Difficulty,
@@ -136,10 +177,44 @@ public sealed class RunManager : MonoBehaviour
         ResolveScoreSystem()?.SetAccumulationEnabled(false);
     }
 
+    private void HandleSpinCompleted(int gridSize, int difficulty, float duration)
+    {
+        StartRun(gridSize, difficulty, duration);
+    }
+
+    private void BindSlotMachine()
+    {
+        SlotMachineController targetSlotMachine = ResolveSlotMachine();
+        if (subscribedSlotMachine == targetSlotMachine)
+            return;
+
+        UnbindSlotMachine();
+        subscribedSlotMachine = targetSlotMachine;
+
+        if (subscribedSlotMachine != null)
+            subscribedSlotMachine.SpinCompleted += HandleSpinCompleted;
+    }
+
+    private void UnbindSlotMachine()
+    {
+        if (subscribedSlotMachine != null)
+            subscribedSlotMachine.SpinCompleted -= HandleSpinCompleted;
+
+        subscribedSlotMachine = null;
+    }
+
     private RunSettings ResolveSettings()
     {
         settings ??= new RunSettings();
         return settings;
+    }
+
+    private SlotMachineController ResolveSlotMachine()
+    {
+        if (slotMachine == null)
+            slotMachine = FindFirstObjectByType<SlotMachineController>();
+
+        return slotMachine;
     }
 
     private RunGenerator ResolveRunGenerator()
@@ -165,6 +240,20 @@ public sealed class RunManager : MonoBehaviour
             scoreSystem = FindFirstObjectByType<ScoreSystem>();
 
         return scoreSystem;
+    }
+
+    private int GenerateRandomSeed()
+    {
+        int previousSeed = ResolveSettings().Seed;
+        int nextSeed;
+
+        do
+        {
+            nextSeed = Random.Range(1, int.MaxValue);
+        }
+        while (nextSeed == previousSeed);
+
+        return nextSeed;
     }
 
     private bool FailStart(string reason)

@@ -1,17 +1,16 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 
 [Serializable]
-public sealed class SlotResultEvent : UnityEvent<string, int, float>
+public sealed class SlotResultEvent : UnityEvent<int, int, float>
 {
 }
 
 [DisallowMultipleComponent]
 public sealed class SlotMachineController : MonoBehaviour
 {
-    private const int DisplayCount = 4;
-    private const float DegreesPerDisplay = 90f;
     private const float DegreesPerRound = 360f;
 
     [Header("Trigger")]
@@ -21,15 +20,15 @@ public sealed class SlotMachineController : MonoBehaviour
 
     [Header("Cylinders")]
     [SerializeField]
-    [Tooltip("Cylinder whose four displays choose the level type.")]
+    [Tooltip("Cylinder that chooses the grid size.")]
     private Transform firstCylinder;
 
     [SerializeField]
-    [Tooltip("Cylinder whose four displays choose the difficulty.")]
+    [Tooltip("Cylinder that chooses the difficulty.")]
     private Transform secondCylinder;
 
     [SerializeField]
-    [Tooltip("Cylinder whose four displays choose the time.")]
+    [Tooltip("Cylinder that chooses the run time.")]
     private Transform thirdCylinder;
 
     [SerializeField]
@@ -49,9 +48,9 @@ public sealed class SlotMachineController : MonoBehaviour
     [Tooltip("Maximum number of complete rounds made by each cylinder (inclusive).")]
     private int maximumRounds = 5;
 
-    [Header("Display Values (0, -90, -180, -270 degrees)")]
+    [Header("Values")]
     [SerializeField]
-    private string[] levelTypes = { "Level Type 1", "Level Type 2", "Level Type 3", "Level Type 4" };
+    private int[] gridSizes = { 6, 7, 8, 9 };
 
     [SerializeField]
     private int[] difficulties = { 1, 2, 3, 4 };
@@ -59,38 +58,51 @@ public sealed class SlotMachineController : MonoBehaviour
     [SerializeField]
     private float[] times = { 30f, 60f, 90f, 120f };
 
+    [Header("Result Text")]
+    [SerializeField]
+    [Tooltip("Text that displays the selected grid size after a spin.")]
+    private TMP_Text gridSizeResultText;
+
+    [SerializeField]
+    [Tooltip("Text that displays the selected difficulty after a spin.")]
+    private TMP_Text difficultyResultText;
+
+    [SerializeField]
+    [Tooltip("Text that displays the selected run time after a spin.")]
+    private TMP_Text timeResultText;
+
     [Header("Result Event")]
     [SerializeField]
-    [Tooltip("Invoked after every cylinder has stopped: level type, difficulty, time.")]
+    [Tooltip("Invoked after every cylinder has stopped: grid size, difficulty, time.")]
     private SlotResultEvent onSpinCompleted = new();
 
     private readonly Transform[] cylinders = new Transform[3];
-    private readonly Quaternion[] zeroRotations = new Quaternion[3];
+    private readonly Quaternion[] originalLocalRotations = new Quaternion[3];
     private readonly float[] currentAngles = new float[3];
     private readonly float[] targetAngles = new float[3];
-    private readonly int[] currentDisplayIndices = new int[3];
-    private readonly int[] targetDisplayIndices = new int[3];
     private readonly bool[] cylinderStopped = new bool[3];
 
     private bool isSpinning;
     private bool hasResult;
+    private int selectedGridSize;
+    private int selectedDifficulty;
+    private float selectedTime;
 
     public bool IsSpinning => isSpinning;
     public bool HasResult => hasResult;
-    public string LevelType { get; private set; }
+    public int GridSize { get; private set; }
     public int Difficulty { get; private set; }
     public float Time { get; private set; }
     public SlotResultEvent OnSpinCompleted => onSpinCompleted;
 
     /// <summary>
-    /// C# result callback with the selected level type, difficulty, and time.
+    /// C# result callback with the independently selected grid size, difficulty,
+    /// and run time.
     /// </summary>
-    public event Action<string, int, float> SpinCompleted;
+    public event Action<int, int, float> SpinCompleted;
 
     private void Awake()
     {
-        EnsureValueArraySizes();
-
         if (lever == null)
             lever = GetComponentInChildren<LeverPull>(true);
 
@@ -110,11 +122,7 @@ public sealed class SlotMachineController : MonoBehaviour
         localRotationAxis.Normalize();
 
         for (int i = 0; i < cylinders.Length; i++)
-        {
-            zeroRotations[i] = cylinders[i].localRotation;
-            currentDisplayIndices[i] = 0;
-            currentAngles[i] = 0f;
-        }
+            originalLocalRotations[i] = cylinders[i].localRotation;
     }
 
     private void OnEnable()
@@ -127,6 +135,12 @@ public sealed class SlotMachineController : MonoBehaviour
     {
         if (lever != null)
             lever.Pulled -= HandleLeverPulled;
+
+        if (isSpinning)
+        {
+            isSpinning = false;
+            RestoreOriginalRotations();
+        }
     }
 
     private void Update()
@@ -167,8 +181,6 @@ public sealed class SlotMachineController : MonoBehaviour
 
         if (localRotationAxis.sqrMagnitude < 0.0001f)
             localRotationAxis = Vector3.up;
-
-        EnsureValueArraySizes();
     }
 
     /// <summary>
@@ -187,20 +199,29 @@ public sealed class SlotMachineController : MonoBehaviour
         if (isSpinning || !isActiveAndEnabled || !HasAllReferences())
             return false;
 
+        if (!HasConfiguredValues())
+        {
+            Debug.LogError(
+                $"{nameof(SlotMachineController)} requires at least one configured " +
+                "grid size, difficulty, and time value.",
+                this);
+            return false;
+        }
+
+        selectedGridSize = gridSizes[UnityEngine.Random.Range(0, gridSizes.Length)];
+        selectedDifficulty = difficulties[UnityEngine.Random.Range(0, difficulties.Length)];
+        selectedTime = times[UnityEngine.Random.Range(0, times.Length)];
+
         hasResult = false;
         isSpinning = true;
 
         for (int i = 0; i < cylinders.Length; i++)
         {
-            int targetIndex = UnityEngine.Random.Range(0, DisplayCount);
             int rounds = UnityEngine.Random.Range(minimumRounds, maximumRounds + 1);
-            int stepsToTarget = (targetIndex - currentDisplayIndices[i] + DisplayCount) % DisplayCount;
-
-            targetDisplayIndices[i] = targetIndex;
-            targetAngles[i] = currentAngles[i]
-                              - rounds * DegreesPerRound
-                              - stepsToTarget * DegreesPerDisplay;
+            currentAngles[i] = 0f;
+            targetAngles[i] = -rounds * DegreesPerRound;
             cylinderStopped[i] = false;
+            cylinders[i].localRotation = originalLocalRotations[i];
         }
 
         return true;
@@ -210,9 +231,9 @@ public sealed class SlotMachineController : MonoBehaviour
     /// Returns the latest completed result. False means the first spin is still
     /// pending or a new spin is currently running.
     /// </summary>
-    public bool TryGetResult(out string levelType, out int difficulty, out float time)
+    public bool TryGetResult(out int gridSize, out int difficulty, out float time)
     {
-        levelType = LevelType;
+        gridSize = GridSize;
         difficulty = Difficulty;
         time = Time;
         return hasResult;
@@ -225,31 +246,54 @@ public sealed class SlotMachineController : MonoBehaviour
 
     private void FinishCylinder(int cylinderIndex)
     {
-        int displayIndex = targetDisplayIndices[cylinderIndex];
-        currentDisplayIndices[cylinderIndex] = displayIndex;
-
-        // Keep the angle small after every spin, and land exactly on a display.
-        currentAngles[cylinderIndex] = -displayIndex * DegreesPerDisplay;
-        SetCylinderAngle(cylinderIndex, currentAngles[cylinderIndex]);
+        currentAngles[cylinderIndex] = 0f;
+        cylinders[cylinderIndex].localRotation = originalLocalRotations[cylinderIndex];
         cylinderStopped[cylinderIndex] = true;
     }
 
     private void CompleteSpin()
     {
         isSpinning = false;
-        LevelType = levelTypes[currentDisplayIndices[0]];
-        Difficulty = difficulties[currentDisplayIndices[1]];
-        Time = times[currentDisplayIndices[2]];
+        GridSize = selectedGridSize;
+        Difficulty = selectedDifficulty;
+        Time = selectedTime;
         hasResult = true;
 
-        SpinCompleted?.Invoke(LevelType, Difficulty, Time);
-        onSpinCompleted.Invoke(LevelType, Difficulty, Time);
+        UpdateResultTexts();
+        SpinCompleted?.Invoke(GridSize, Difficulty, Time);
+        onSpinCompleted.Invoke(GridSize, Difficulty, Time);
+    }
+
+    private void UpdateResultTexts()
+    {
+        if (gridSizeResultText != null)
+            gridSizeResultText.text = GridSize.ToString();
+
+        if (difficultyResultText != null)
+            difficultyResultText.text = Difficulty.ToString();
+
+        if (timeResultText != null)
+            timeResultText.text = Time.ToString("0.##");
     }
 
     private void SetCylinderAngle(int cylinderIndex, float angle)
     {
         cylinders[cylinderIndex].localRotation =
-            zeroRotations[cylinderIndex] * Quaternion.AngleAxis(angle, localRotationAxis);
+            originalLocalRotations[cylinderIndex] *
+            Quaternion.AngleAxis(angle, localRotationAxis);
+    }
+
+    private void RestoreOriginalRotations()
+    {
+        for (int i = 0; i < cylinders.Length; i++)
+        {
+            if (cylinders[i] == null)
+                continue;
+
+            currentAngles[i] = 0f;
+            cylinders[i].localRotation = originalLocalRotations[i];
+            cylinderStopped[i] = true;
+        }
     }
 
     private bool HasAllReferences()
@@ -260,10 +304,10 @@ public sealed class SlotMachineController : MonoBehaviour
                thirdCylinder != null;
     }
 
-    private void EnsureValueArraySizes()
+    private bool HasConfiguredValues()
     {
-        Array.Resize(ref levelTypes, DisplayCount);
-        Array.Resize(ref difficulties, DisplayCount);
-        Array.Resize(ref times, DisplayCount);
+        return gridSizes != null && gridSizes.Length > 0 &&
+               difficulties != null && difficulties.Length > 0 &&
+               times != null && times.Length > 0;
     }
 }

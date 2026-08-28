@@ -4,7 +4,12 @@ using UnityEngine;
 [Serializable]
 public sealed class RunSettings
 {
+    public const int MinimumGridSize = 1;
     public const float MinimumDuration = 0.1f;
+
+    [SerializeField, Min(MinimumGridSize)]
+    [Tooltip("Number of cells along both sides of the square grid.")]
+    private int gridSize = 8;
 
     [SerializeField, Range(
         DifficultyProfile.MinimumDifficulty,
@@ -17,6 +22,12 @@ public sealed class RunSettings
 
     [SerializeField]
     private int seed = 12345;
+
+    public int GridSize
+    {
+        get => gridSize;
+        set => gridSize = Mathf.Max(MinimumGridSize, value);
+    }
 
     public int Difficulty
     {
@@ -50,8 +61,17 @@ public sealed class RunSettings
         Seed = seed;
     }
 
+    public RunSettings(int gridSize, int difficulty, float duration, int seed)
+    {
+        GridSize = gridSize;
+        Difficulty = difficulty;
+        Duration = duration;
+        Seed = seed;
+    }
+
     internal void Validate()
     {
+        GridSize = gridSize;
         Difficulty = difficulty;
         Duration = duration;
     }
