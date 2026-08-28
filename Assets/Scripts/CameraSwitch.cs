@@ -11,6 +11,8 @@ public class CameraSwitch : MonoBehaviour
     private CinemachineCamera shopCamera;
     [SerializeField]
     private CinemachineCamera gameCamera;
+    [SerializeField]
+    private float waitFor;
 
     public void SwitchToShop()
     {
@@ -31,7 +33,7 @@ public class CameraSwitch : MonoBehaviour
 
     private IEnumerator SwitchToGameRoutine()
     {
-        yield return new WaitForSeconds(5f);
+        yield return new WaitForSeconds(waitFor);
 
         gambaCamera.Priority = 0;
         shopCamera.Priority = 0;
