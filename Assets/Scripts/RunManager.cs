@@ -1,6 +1,9 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 [DisallowMultipleComponent]
+[RequireComponent(typeof(ChaosController))]
+[DefaultExecutionOrder(-200)]
 public sealed class RunManager : MonoBehaviour
 {
     [Header("Run")]
@@ -13,7 +16,7 @@ public sealed class RunManager : MonoBehaviour
 
     [Header("Systems")]
     [SerializeField]
-    [Tooltip("Slot machine whose grid size, difficulty, and time start each game.")]
+    [Tooltip("Slot machine whose grid size, difficulty, time, and chaos start each game.")]
     private SlotMachineController slotMachine;
 
     [SerializeField]
@@ -21,6 +24,19 @@ public sealed class RunManager : MonoBehaviour
 
     [SerializeField]
     private ScoreSystem scoreSystem;
+
+    [SerializeField]
+    [Tooltip("Dedicated owner of random per-run gameplay events.")]
+    private ChaosController chaosController;
+
+    [SerializeField]
+    [Tooltip("Electricity simulation reset and paused when a run ends.")]
+    private CircuitSystem circuitSystem;
+
+    [Header("Events")]
+    [SerializeField]
+    [Tooltip("Invoked after a completed run has stopped and the Display board and circuit have been cleared.")]
+    private UnityEvent onRunEnd = new();
 
     private SlotMachineController subscribedSlotMachine;
     private bool isRunning;
@@ -30,6 +46,9 @@ public sealed class RunManager : MonoBehaviour
     public RunSettings Settings => ResolveSettings();
     public RunGenerator Generator => ResolveRunGenerator();
     public ScoreSystem ScoreSystem => ResolveScoreSystem();
+    public ChaosController ChaosController => ResolveChaosController();
+    public CircuitSystem CircuitSystem => ResolveCircuitSystem();
+    public UnityEvent OnRunEnd => onRunEnd;
     public bool IsRunning => isRunning;
     public float RemainingTime => remainingTime;
     public float ElapsedTime => Mathf.Max(0f, Settings.Duration - remainingTime);
@@ -45,11 +64,15 @@ public sealed class RunManager : MonoBehaviour
         slotMachine = FindFirstObjectByType<SlotMachineController>();
         runGenerator = GetComponent<RunGenerator>();
         scoreSystem = GetComponent<ScoreSystem>();
+        chaosController = GetComponent<ChaosController>();
+        circuitSystem = GetComponent<CircuitSystem>();
     }
 
     private void OnEnable()
     {
         BindSlotMachine();
+        if (!isRunning)
+            StopGameplayUpdates(clearBoard: false);
     }
 
     private void OnValidate()
@@ -77,6 +100,8 @@ public sealed class RunManager : MonoBehaviour
 
         if (isRunning)
             EndRun();
+        else
+            StopGameplayUpdates(clearBoard: false);
     }
 
     /// <summary>
@@ -88,18 +113,37 @@ public sealed class RunManager : MonoBehaviour
         return StartRun(
             currentSettings.GridSize,
             currentSettings.Difficulty,
-            currentSettings.Duration);
+            currentSettings.Duration,
+            currentSettings.ChaosValue);
     }
 
     /// <summary>
-    /// Applies the three slot results and starts a run with a newly generated seed.
+    /// Starts from three legacy slot results while preserving the configured
+    /// ChaosValue.
     /// </summary>
     public bool StartRun(Vector2Int gridSize, int difficulty, float duration)
+    {
+        return StartRun(
+            gridSize,
+            difficulty,
+            duration,
+            ResolveSettings().ChaosValue);
+    }
+
+    /// <summary>
+    /// Applies all four independent run parameters and starts with a new seed.
+    /// </summary>
+    public bool StartRun(
+        Vector2Int gridSize,
+        int difficulty,
+        float duration,
+        int chaosValue)
     {
         return StartRunInternal(
             gridSize,
             difficulty,
             duration,
+            chaosValue,
             GenerateRandomSeed());
     }
 
@@ -107,21 +151,27 @@ public sealed class RunManager : MonoBehaviour
         Vector2Int gridSize,
         int difficulty,
         float duration,
+        int chaosValue,
         int seed)
     {
         RunSettings currentSettings = ResolveSettings();
         currentSettings.GridSize = gridSize;
         currentSettings.Difficulty = difficulty;
         currentSettings.Duration = duration;
+        currentSettings.ChaosValue = chaosValue;
         currentSettings.Seed = seed;
 
         RunGenerator targetGenerator = ResolveRunGenerator();
         ScoreSystem targetScoreSystem = ResolveScoreSystem();
+        ChaosController targetChaosController = ResolveChaosController();
+        CircuitSystem targetCircuitSystem = ResolveCircuitSystem();
 
         isRunning = false;
         remainingTime = 0f;
         lastStartFailureReason = string.Empty;
         targetScoreSystem?.SetAccumulationEnabled(false);
+        targetChaosController?.StopRun();
+        targetCircuitSystem?.SetSimulationEnabled(false);
 
         if (targetGenerator == null)
             return FailStart("RunManager requires a RunGenerator.");
@@ -129,12 +179,20 @@ public sealed class RunManager : MonoBehaviour
         if (targetScoreSystem == null)
             return FailStart("RunManager requires a ScoreSystem.");
 
+        if (targetChaosController == null)
+            return FailStart("RunManager requires a ChaosController.");
+
+        if (targetCircuitSystem == null)
+            return FailStart("RunManager requires a CircuitSystem.");
+
         GridBoard targetBoard = targetGenerator.Board;
         if (targetBoard == null)
             return FailStart("RunManager requires a GridBoard through its RunGenerator.");
 
+        targetBoard.SetGameplayInputEnabled(false);
         targetScoreSystem.ResetScore();
         targetGenerator.ClearBoard();
+        targetCircuitSystem.ResetCircuitState();
         targetBoard.SetSize(
             currentSettings.GridSize.x,
             currentSettings.GridSize.y);
@@ -151,6 +209,14 @@ public sealed class RunManager : MonoBehaviour
 
         remainingTime = currentSettings.Duration;
         isRunning = true;
+        targetBoard.SetGameplayInputEnabled(true);
+        targetCircuitSystem.MarkTopologyDirty();
+        targetCircuitSystem.SetSimulationEnabled(true);
+        targetChaosController.StartRun(
+            targetBoard,
+            targetGenerator,
+            currentSettings.ChaosValue,
+            currentSettings.Seed);
         targetScoreSystem.SetAccumulationEnabled(true);
         return true;
     }
@@ -174,17 +240,22 @@ public sealed class RunManager : MonoBehaviour
     [ContextMenu("End Run")]
     public void EndRun()
     {
+        bool invokeRunEnded = isRunning;
         isRunning = false;
         remainingTime = 0f;
-        ResolveScoreSystem()?.SetAccumulationEnabled(false);
+        StopGameplayUpdates(clearBoard: true);
+
+        if (invokeRunEnded)
+            onRunEnd?.Invoke();
     }
 
     private void HandleSpinCompleted(
         Vector2Int gridSize,
         int difficulty,
-        float duration)
+        float duration,
+        int chaosValue)
     {
-        StartRun(gridSize, difficulty, duration);
+        StartRun(gridSize, difficulty, duration, chaosValue);
     }
 
     private void BindSlotMachine()
@@ -197,13 +268,13 @@ public sealed class RunManager : MonoBehaviour
         subscribedSlotMachine = targetSlotMachine;
 
         if (subscribedSlotMachine != null)
-            subscribedSlotMachine.SpinCompleted += HandleSpinCompleted;
+            subscribedSlotMachine.SpinCompletedWithChaos += HandleSpinCompleted;
     }
 
     private void UnbindSlotMachine()
     {
         if (subscribedSlotMachine != null)
-            subscribedSlotMachine.SpinCompleted -= HandleSpinCompleted;
+            subscribedSlotMachine.SpinCompletedWithChaos -= HandleSpinCompleted;
 
         subscribedSlotMachine = null;
     }
@@ -247,6 +318,50 @@ public sealed class RunManager : MonoBehaviour
         return scoreSystem;
     }
 
+    private ChaosController ResolveChaosController()
+    {
+        if (chaosController == null)
+            chaosController = GetComponent<ChaosController>();
+
+        return chaosController;
+    }
+
+    private CircuitSystem ResolveCircuitSystem()
+    {
+        if (circuitSystem == null)
+            circuitSystem = GetComponent<CircuitSystem>();
+
+        if (circuitSystem == null)
+        {
+            GridBoard targetBoard = ResolveRunGenerator()?.Board;
+            if (targetBoard != null)
+                circuitSystem = targetBoard.GetComponent<CircuitSystem>();
+        }
+
+        return circuitSystem;
+    }
+
+    private void StopGameplayUpdates(bool clearBoard)
+    {
+        ResolveChaosController()?.StopRun();
+        ResolveScoreSystem()?.SetAccumulationEnabled(false);
+
+        RunGenerator targetGenerator = ResolveRunGenerator();
+        GridBoard targetBoard = targetGenerator != null
+            ? targetGenerator.Board
+            : null;
+        targetBoard?.SetGameplayInputEnabled(false);
+
+        CircuitSystem targetCircuitSystem = ResolveCircuitSystem();
+        targetCircuitSystem?.SetSimulationEnabled(false);
+
+        if (!clearBoard)
+            return;
+
+        targetGenerator?.ClearBoard();
+        targetCircuitSystem?.ResetCircuitState();
+    }
+
     private int GenerateRandomSeed()
     {
         int previousSeed = ResolveSettings().Seed;
@@ -266,6 +381,7 @@ public sealed class RunManager : MonoBehaviour
         isRunning = false;
         remainingTime = 0f;
         lastStartFailureReason = reason;
+        StopGameplayUpdates(clearBoard: true);
         Debug.LogError(reason, this);
         return false;
     }

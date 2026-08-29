@@ -150,6 +150,7 @@ public sealed class CircuitSystem : MonoBehaviour
 
     private GridBoard subscribedBoard;
     private bool topologyDirty = true;
+    private bool simulationEnabled = true;
     private int lastBuiltTopologyRevision = -1;
     private int rebuildCount;
     private int powerTickCount;
@@ -168,6 +169,7 @@ public sealed class CircuitSystem : MonoBehaviour
     public float NetIdLabelHeight => netIdLabelHeight;
     public float TickInterval => tickInterval;
     public float TickAccumulator => (float)tickAccumulator;
+    public bool SimulationEnabled => simulationEnabled;
     public int RebuildCount => rebuildCount;
     public int PowerTickCount => powerTickCount;
     public int LastBuiltTopologyRevision => lastBuiltTopologyRevision;
@@ -224,9 +226,21 @@ public sealed class CircuitSystem : MonoBehaviour
     private void Update()
     {
         if (Application.isPlaying)
-            AdvanceSimulation(Time.deltaTime);
+        {
+            if (simulationEnabled)
+                AdvanceSimulation(Time.deltaTime);
+        }
         else
             RebuildIfDirty();
+    }
+
+    public void SetSimulationEnabled(bool enabled)
+    {
+        if (simulationEnabled == enabled)
+            return;
+
+        simulationEnabled = enabled;
+        tickAccumulator = 0d;
     }
 
     public void MarkTopologyDirty()
@@ -253,7 +267,7 @@ public sealed class CircuitSystem : MonoBehaviour
     /// </summary>
     public int AdvanceSimulation(float deltaTime)
     {
-        if (deltaTime <= 0f)
+        if (!simulationEnabled || deltaTime <= 0f)
             return 0;
 
         tickAccumulator += deltaTime;
@@ -273,16 +287,46 @@ public sealed class CircuitSystem : MonoBehaviour
     }
 
     /// <summary>
+    /// Clears cached nets, pending power state, and fixed-tick timing without
+    /// changing the board. Call after board cleanup to leave an empty circuit.
+    /// </summary>
+    public void ResetCircuitState()
+    {
+        BindBoard();
+        StagePreviousTopologyState();
+        ResetAllStagedState();
+
+        nets.Clear();
+        wireNets.Clear();
+        portNets.Clear();
+        floodFillQueue.Clear();
+        consumerBuffer.Clear();
+        powerTickBuffer.Clear();
+        powerTickSet.Clear();
+        availablePowerBuffer.Clear();
+        scoreRateBuffer.Clear();
+        scoreRateSet.Clear();
+        tickAccumulator = 0d;
+
+        GridBoard targetBoard = ResolveBoard();
+        lastBuiltTopologyRevision = targetBoard != null
+            ? targetBoard.TopologyRevision
+            : -1;
+        topologyDirty = false;
+        TopologyRebuilt?.Invoke();
+    }
+
+    /// <summary>
     /// Evaluates power using the cached topology, then lets stateful components
     /// apply the result. This does not rebuild electrical nets unless topology
     /// was marked dirty.
     /// </summary>
     public void SimulatePower(float deltaTime)
     {
-        RebuildIfDirty();
-        if (deltaTime <= 0f)
+        if (!simulationEnabled || deltaTime <= 0f)
             return;
 
+        RebuildIfDirty();
         ClearPower();
         GatherPowerTickParticipants();
         ResetStalePowerParticipants();

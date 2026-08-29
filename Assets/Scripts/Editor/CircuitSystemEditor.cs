@@ -14,6 +14,9 @@ public sealed class CircuitSystemEditor : Editor
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Topology", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "Simulation Enabled",
+            circuit.SimulationEnabled.ToString());
         EditorGUILayout.LabelField("Nets", circuit.Nets.Count.ToString());
         EditorGUILayout.LabelField("Rebuild Count", circuit.RebuildCount.ToString());
         EditorGUILayout.LabelField("Power Ticks", circuit.PowerTickCount.ToString());
@@ -73,15 +76,16 @@ public sealed class CircuitSystemEditor : Editor
                 continue;
 
             GUIStyle powerStyle = new(EditorStyles.boldLabel);
-            powerStyle.normal.textColor = consumer.ReceivedPower switch
+            powerStyle.normal.textColor = consumer.PowerState switch
             {
-                2 => Color.green,
-                >= 3 => Color.red,
+                ConsumerPowerState.CorrectlyPowered => Color.green,
+                ConsumerPowerState.Overloaded => Color.red,
+                ConsumerPowerState.Underpowered => new Color(1f, 0.62f, 0.08f),
                 _ => Color.white
             };
             Handles.Label(
                 consumer.transform.position + labelOffset,
-                $"Received: {consumer.ReceivedPower}",
+                $"Received: {consumer.ReceivedPower} / Required: {consumer.RequiredPower}",
                 powerStyle);
         }
 

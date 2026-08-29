@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public enum ConsumerPowerState
 {
@@ -14,9 +15,21 @@ public abstract class ScoredPowerConsumerComponent :
     ICircuitPowerConsumer,
     IScoreRateSource
 {
+    public const int MinimumRequiredPower = 1;
+    public const int DefaultRequiredPower = 2;
+
+    // Compatibility names retained for code written against the earlier API.
+    public const int MinimumIdealPower = MinimumRequiredPower;
+    public const int DefaultIdealPower = DefaultRequiredPower;
+
     [SerializeField]
     [Tooltip("Score system that receives this consumer's score rate. If empty, ScoreSystem.Instance is used.")]
     private ScoreSystem scoreSystem;
+
+    [FormerlySerializedAs("idealPower")]
+    [SerializeField, Min(MinimumRequiredPower)]
+    [Tooltip("Received power that gives this Lamp or Fan its positive score rate.")]
+    private int requiredPower = DefaultRequiredPower;
 
     [SerializeField, HideInInspector]
     private int receivedPower;
@@ -38,33 +51,46 @@ public abstract class ScoredPowerConsumerComponent :
     }
 
     public int ReceivedPower => receivedPower;
+    public int RequiredPower => requiredPower;
+    public int IdealPower => RequiredPower;
 
-    public ConsumerPowerState PowerState => receivedPower switch
+    public ConsumerPowerState PowerState
     {
-        1 => ConsumerPowerState.Underpowered,
-        2 => ConsumerPowerState.CorrectlyPowered,
-        >= 3 => ConsumerPowerState.Overloaded,
-        _ => ConsumerPowerState.Off
-    };
+        get
+        {
+            if (receivedPower <= 0)
+                return ConsumerPowerState.Off;
 
-    public int ScorePerSecond => receivedPower switch
-    {
-        2 => 1,
-        >= 3 => -1,
-        _ => 0
-    };
+            if (receivedPower < requiredPower)
+                return ConsumerPowerState.Underpowered;
+
+            return receivedPower == requiredPower
+                ? ConsumerPowerState.CorrectlyPowered
+                : ConsumerPowerState.Overloaded;
+        }
+    }
+
+    public int ScorePerSecond => receivedPower == requiredPower
+        ? 1
+        : receivedPower > requiredPower
+            ? -1
+            : 0;
 
     public event Action<int> ReceivedPowerChanged;
+    public event Action<int> RequiredPowerChanged;
+    public event Action<int> IdealPowerChanged;
     public event Action<ConsumerPowerState> PowerStateChanged;
 
     protected override void Reset()
     {
+        requiredPower = DefaultRequiredPower;
         EnsureInputPort();
         base.Reset();
     }
 
     protected override void OnEnable()
     {
+        requiredPower = Mathf.Max(MinimumRequiredPower, requiredPower);
         EnsureInputPort();
         SetReceivedPower(null, 0);
         base.OnEnable();
@@ -73,6 +99,7 @@ public abstract class ScoredPowerConsumerComponent :
 
     protected override void OnValidate()
     {
+        requiredPower = Mathf.Max(MinimumRequiredPower, requiredPower);
         EnsureInputPort();
         base.OnValidate();
         RefreshScoreRateReport();
@@ -80,6 +107,7 @@ public abstract class ScoredPowerConsumerComponent :
 
     protected virtual void OnDisable()
     {
+        SetReceivedPower(null, 0);
         RemoveScoreRateReport();
     }
 
@@ -101,6 +129,30 @@ public abstract class ScoredPowerConsumerComponent :
 
         if (PowerState != previousState)
             PowerStateChanged?.Invoke(PowerState);
+    }
+
+    public void SetRequiredPower(int value)
+    {
+        int nextRequiredPower = Mathf.Max(MinimumRequiredPower, value);
+        if (requiredPower == nextRequiredPower)
+            return;
+
+        ConsumerPowerState previousState = PowerState;
+        int previousScoreRate = ScorePerSecond;
+        requiredPower = nextRequiredPower;
+        RequiredPowerChanged?.Invoke(requiredPower);
+        IdealPowerChanged?.Invoke(requiredPower);
+
+        if (PowerState != previousState)
+            PowerStateChanged?.Invoke(PowerState);
+
+        if (ScorePerSecond != previousScoreRate)
+            RefreshScoreRateReport();
+    }
+
+    public void SetIdealPower(int value)
+    {
+        SetRequiredPower(value);
     }
 
     public void RefreshScoreRateReport()

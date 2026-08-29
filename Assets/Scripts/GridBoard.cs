@@ -108,6 +108,7 @@ public sealed class GridBoard : MonoBehaviour
     private bool occupancyDirty = true;
     private bool rebuildingOccupancy;
     private bool wireViewsDirty = true;
+    private bool gameplayInputEnabled = true;
     private int topologyRevision;
     private WireEditMode activeWireEditMode;
     private bool hasPreviousWireDragCell;
@@ -127,6 +128,9 @@ public sealed class GridBoard : MonoBehaviour
     public Transform DisplayRoot => ResolveDisplayRoot();
     public Transform ComponentsRoot => ResolveComponentsRoot();
     public int TopologyRevision => topologyRevision;
+    public bool GameplayInputEnabled => gameplayInputEnabled;
+    public bool WirePlacementEnabled =>
+        enableWirePlacement && gameplayInputEnabled;
     public bool DrawGridInGameView
     {
         get => drawGridInGameView;
@@ -230,13 +234,27 @@ public sealed class GridBoard : MonoBehaviour
             UpdateRuntimeGridVisibility();
         }
 
-        if (!Application.isPlaying || !enableWirePlacement)
+        if (!Application.isPlaying || !WirePlacementEnabled)
         {
             ResetWireDrag();
             return;
         }
 
         HandleWireInput();
+    }
+
+    /// <summary>
+    /// Enables or blocks player wire editing without changing the board's
+    /// inspector-level wire placement configuration.
+    /// </summary>
+    public void SetGameplayInputEnabled(bool enabled)
+    {
+        if (gameplayInputEnabled == enabled)
+            return;
+
+        gameplayInputEnabled = enabled;
+        if (!gameplayInputEnabled)
+            ResetWireDrag();
     }
 
     /// <summary>

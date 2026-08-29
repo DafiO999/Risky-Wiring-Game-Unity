@@ -8,6 +8,11 @@ public sealed class SlotResultEvent : UnityEvent<Vector2Int, int, float>
 {
 }
 
+[Serializable]
+public sealed class SlotChaosResultEvent : UnityEvent<Vector2Int, int, float, int>
+{
+}
+
 [DisallowMultipleComponent]
 public sealed class SlotMachineController : MonoBehaviour
 {
@@ -64,6 +69,10 @@ public sealed class SlotMachineController : MonoBehaviour
     [SerializeField]
     private float[] times = { 30f, 60f, 90f, 120f };
 
+    [SerializeField]
+    [Tooltip("Chaos values rolled independently from grid size, difficulty, and time.")]
+    private int[] chaosValues = { 0, 3, 6, 10 };
+
     [Header("Result Text")]
     [SerializeField]
     [Tooltip("Text that displays the selected grid size after a spin.")]
@@ -77,10 +86,18 @@ public sealed class SlotMachineController : MonoBehaviour
     [Tooltip("Text that displays the selected run time after a spin.")]
     private TMP_Text timeResultText;
 
+    [SerializeField]
+    [Tooltip("Optional text that displays the independently selected ChaosValue.")]
+    private TMP_Text chaosResultText;
+
     [Header("Result Event")]
     [SerializeField]
-    [Tooltip("Invoked after every cylinder has stopped: grid size, difficulty, time.")]
+    [Tooltip("Legacy callback invoked with grid size, difficulty, and time.")]
     private SlotResultEvent onSpinCompleted = new();
+
+    [SerializeField]
+    [Tooltip("Invoked with grid size, difficulty, time, and ChaosValue.")]
+    private SlotChaosResultEvent onSpinCompletedWithChaos = new();
 
     private readonly Transform[] cylinders = new Transform[3];
     private readonly Quaternion[] originalLocalRotations = new Quaternion[3];
@@ -93,19 +110,28 @@ public sealed class SlotMachineController : MonoBehaviour
     private Vector2Int selectedGridSize;
     private int selectedDifficulty;
     private float selectedTime;
+    private int selectedChaosValue;
 
     public bool IsSpinning => isSpinning;
     public bool HasResult => hasResult;
     public Vector2Int GridSize { get; private set; }
     public int Difficulty { get; private set; }
     public float Time { get; private set; }
+    public int ChaosValue { get; private set; }
     public SlotResultEvent OnSpinCompleted => onSpinCompleted;
+    public SlotChaosResultEvent OnSpinCompletedWithChaos =>
+        onSpinCompletedWithChaos;
 
     /// <summary>
     /// C# result callback with the independently selected grid size, difficulty,
-    /// and run time.
+    /// and run time. Use SpinCompletedWithChaos for the complete run result.
     /// </summary>
     public event Action<Vector2Int, int, float> SpinCompleted;
+
+    /// <summary>
+    /// Complete result callback including the independent ChaosValue.
+    /// </summary>
+    public event Action<Vector2Int, int, float, int> SpinCompletedWithChaos;
 
     private void Awake()
     {
@@ -209,7 +235,7 @@ public sealed class SlotMachineController : MonoBehaviour
         {
             Debug.LogError(
                 $"{nameof(SlotMachineController)} requires at least one configured " +
-                "grid size, difficulty, and time value.",
+                "grid size, difficulty, time, and chaos value.",
                 this);
             return false;
         }
@@ -217,6 +243,7 @@ public sealed class SlotMachineController : MonoBehaviour
         selectedGridSize = gridSizes[UnityEngine.Random.Range(0, gridSizes.Length)];
         selectedDifficulty = difficulties[UnityEngine.Random.Range(0, difficulties.Length)];
         selectedTime = times[UnityEngine.Random.Range(0, times.Length)];
+        selectedChaosValue = chaosValues[UnityEngine.Random.Range(0, chaosValues.Length)];
 
         hasResult = false;
         isSpinning = true;
@@ -245,6 +272,20 @@ public sealed class SlotMachineController : MonoBehaviour
         return hasResult;
     }
 
+    public bool TryGetResult(
+        out Vector2Int gridSize,
+        out int difficulty,
+        out float time,
+        out int chaosValue)
+    {
+        bool resultAvailable = TryGetResult(
+            out gridSize,
+            out difficulty,
+            out time);
+        chaosValue = ChaosValue;
+        return resultAvailable;
+    }
+
     private void HandleLeverPulled()
     {
         TrySpin();
@@ -263,11 +304,17 @@ public sealed class SlotMachineController : MonoBehaviour
         GridSize = selectedGridSize;
         Difficulty = selectedDifficulty;
         Time = selectedTime;
+        ChaosValue = Mathf.Clamp(
+            selectedChaosValue,
+            RunSettings.MinimumChaosValue,
+            RunSettings.MaximumChaosValue);
         hasResult = true;
 
         UpdateResultTexts();
         SpinCompleted?.Invoke(GridSize, Difficulty, Time);
+        SpinCompletedWithChaos?.Invoke(GridSize, Difficulty, Time, ChaosValue);
         onSpinCompleted.Invoke(GridSize, Difficulty, Time);
+        onSpinCompletedWithChaos.Invoke(GridSize, Difficulty, Time, ChaosValue);
     }
 
     private void UpdateResultTexts()
@@ -280,6 +327,9 @@ public sealed class SlotMachineController : MonoBehaviour
 
         if (timeResultText != null)
             timeResultText.text = Time.ToString("0.##");
+
+        if (chaosResultText != null)
+            chaosResultText.text = ChaosValue.ToString();
     }
 
     private void SetCylinderAngle(int cylinderIndex, float angle)
@@ -314,6 +364,7 @@ public sealed class SlotMachineController : MonoBehaviour
     {
         return gridSizes != null && gridSizes.Length > 0 &&
                difficulties != null && difficulties.Length > 0 &&
-               times != null && times.Length > 0;
+               times != null && times.Length > 0 &&
+               chaosValues != null && chaosValues.Length > 0;
     }
 }

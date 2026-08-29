@@ -6,6 +6,8 @@ public sealed class RunSettings
 {
     public const int MinimumGridSize = 1;
     public const float MinimumDuration = 0.1f;
+    public const int MinimumChaosValue = 0;
+    public const int MaximumChaosValue = 10;
 
     [SerializeField]
     [Tooltip("Grid dimensions in cells: width (X) and height (Y).")]
@@ -19,6 +21,10 @@ public sealed class RunSettings
     [SerializeField, Min(MinimumDuration)]
     [Tooltip("Run length in seconds.")]
     private float duration = 60f;
+
+    [SerializeField, Range(MinimumChaosValue, MaximumChaosValue)]
+    [Tooltip("Controls only the frequency and strength of random chaos events. Zero disables chaos.")]
+    private int chaosValue;
 
     [SerializeField]
     private int seed = 12345;
@@ -44,6 +50,15 @@ public sealed class RunSettings
     {
         get => duration;
         set => duration = Mathf.Max(MinimumDuration, value);
+    }
+
+    public int ChaosValue
+    {
+        get => chaosValue;
+        set => chaosValue = Mathf.Clamp(
+            value,
+            MinimumChaosValue,
+            MaximumChaosValue);
     }
 
     public int Seed
@@ -73,11 +88,37 @@ public sealed class RunSettings
         int difficulty,
         float duration,
         int seed)
+        : this(gridSize, difficulty, duration, MinimumChaosValue, seed)
+    {
+    }
+
+    public RunSettings(
+        Vector2Int gridSize,
+        int difficulty,
+        float duration,
+        int chaosValue,
+        int seed)
     {
         GridSize = gridSize;
         Difficulty = difficulty;
         Duration = duration;
+        ChaosValue = chaosValue;
         Seed = seed;
+    }
+
+    public RunSettings(
+        int gridSize,
+        int difficulty,
+        float duration,
+        int chaosValue,
+        int seed)
+        : this(
+            new Vector2Int(gridSize, gridSize),
+            difficulty,
+            duration,
+            chaosValue,
+            seed)
+    {
     }
 
     internal void Validate()
@@ -85,5 +126,6 @@ public sealed class RunSettings
         GridSize = gridSize;
         Difficulty = difficulty;
         Duration = duration;
+        ChaosValue = chaosValue;
     }
 }

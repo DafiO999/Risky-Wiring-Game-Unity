@@ -291,6 +291,25 @@ public sealed class RunGenerator : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Removes one runtime-generated component through the same ownership,
+    /// placement, topology, and destruction lifecycle used by run cleanup.
+    /// </summary>
+    public bool RemoveGeneratedComponent(BoardComponent component)
+    {
+        if (component == null || !generatedComponents.Remove(component))
+            return false;
+
+        GridBoard targetBoard = ResolveBoard();
+        DestroyComponentObject(component);
+
+        if (targetBoard != null)
+            RebuildReservedPortCells(targetBoard);
+
+        lastGeneratedCounts = CountGeneratedComponents();
+        return true;
+    }
+
     private bool TryPlaceComponent(
         BoardComponent component,
         GridBoard targetBoard,
@@ -784,9 +803,9 @@ public sealed class RunGenerator : MonoBehaviour
         if (component == null)
             return;
 
-        component.ClearPlacement();
         GameObject componentObject = component.gameObject;
         componentObject.SetActive(false);
+        component.ClearPlacement();
 
         if (Application.isPlaying)
         {

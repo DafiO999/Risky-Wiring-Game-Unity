@@ -3200,9 +3200,11 @@ MonoBehaviour:
   - 60
   - 90
   - 120
+  chaosValues: 0000000003000000060000000a000000
   gridSizeResultText: {fileID: 340731736}
   difficultyResultText: {fileID: 1322506446}
   timeResultText: {fileID: 342672975}
+  chaosResultText: {fileID: 0}
   onSpinCompleted:
     m_PersistentCalls:
       m_Calls:
@@ -3230,6 +3232,9 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+  onSpinCompletedWithChaos:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &1092374333
 GameObject:
   m_ObjectHideFlags: 0
@@ -4788,6 +4793,7 @@ GameObject:
   - component: {fileID: 1438351356}
   - component: {fileID: 1438351355}
   - component: {fileID: 1438351354}
+  - component: {fileID: 1438351359}
   m_Layer: 0
   m_Name: grid
   m_TagString: Untagged
@@ -4826,11 +4832,44 @@ MonoBehaviour:
     gridSize: {x: 8, y: 8}
     difficulty: 3
     duration: 60
+    chaosValue: 3
     seed: 13687
   startAutomatically: 0
   slotMachine: {fileID: 0}
   runGenerator: {fileID: 1438351355}
   scoreSystem: {fileID: 0}
+  chaosController: {fileID: 1438351359}
+  circuitSystem: {fileID: 1438351357}
+  onRunEnd:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &1438351359
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1438351352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f65c98e14cd4b2f932549712c51ee64, type: 3}
+  m_Name: ''
+  m_EditorClassIdentifier: Assembly-CSharp::ChaosController
+  board: {fileID: 1438351358}
+  runGenerator: {fileID: 1438351355}
+  circuitSystem: {fileID: 1438351357}
+  lowChaosInterval: 18
+  highChaosInterval: 4
+  intervalJitter: 0.25
+  maximumWireFaultCells: 4
+  maximumBatteryTargets: 3
+  minimumBatterySwing: 0.1
+  maximumBatterySwing: 0.5
+  maximumGeneratorTargets: 3
+  maximumGeneratorPowerAtFullChaos: 6
+  maximumConsumerTargets: 3
+  maximumConsumerRequiredPowerAtFullChaos: 6
+  maximumConsumerRemovals: 2
 --- !u!114 &1438351355
 MonoBehaviour:
   m_ObjectHideFlags: 0

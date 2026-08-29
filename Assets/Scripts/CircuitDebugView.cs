@@ -303,8 +303,14 @@ public sealed class CircuitDebugView : MonoBehaviour
                 .Append("Received Power: ")
                 .AppendLine(consumer.ReceivedPower.ToString());
             textBuilder
+                .Append("Required Power: ")
+                .AppendLine(consumer.RequiredPower.ToString());
+            textBuilder
                 .Append("Power State: ")
                 .AppendLine(consumer.PowerState.ToString());
+            textBuilder
+                .Append("Score / Second: ")
+                .AppendLine(consumer.ScorePerSecond.ToString());
         }
 
         if (component is GeneratorComponent generator)
@@ -326,8 +332,8 @@ public sealed class CircuitDebugView : MonoBehaviour
                 .Append("Generator Output: ")
                 .Append(connectedOutput)
                 .Append("  (")
-                .Append(GeneratorComponent.PowerPerConnectedOutput)
-                .AppendLine(" per connected port)");
+                .Append(generator.PowerPerActiveOutput)
+                .AppendLine(" per active output)");
         }
 
         if (component is BatteryComponent battery)

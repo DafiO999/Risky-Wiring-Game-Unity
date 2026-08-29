@@ -75,8 +75,16 @@ public sealed class BoardComponentEditor : Editor
             if (scoreSystemProperty != null)
                 EditorGUILayout.PropertyField(scoreSystemProperty);
 
+            SerializedProperty requiredPowerProperty =
+                serializedObject.FindProperty("requiredPower");
+            if (requiredPowerProperty != null)
+                EditorGUILayout.PropertyField(requiredPowerProperty);
+
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Power Debug", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "Required Power",
+                consumer.RequiredPower.ToString());
             EditorGUILayout.LabelField("Received Power", consumer.ReceivedPower.ToString());
             EditorGUILayout.LabelField("Score / Second", consumer.ScorePerSecond.ToString());
         }

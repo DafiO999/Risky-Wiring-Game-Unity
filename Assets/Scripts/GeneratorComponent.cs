@@ -1,25 +1,58 @@
+using System;
 using UnityEngine;
 
 public sealed class GeneratorComponent : BoardComponent, ICircuitPowerSource
 {
-    public const int PowerPerConnectedOutput = 1;
+    public const int MinimumPowerPerActiveOutput = 1;
+
+    // Retained as the default value and for compatibility with existing code.
+    public const int PowerPerConnectedOutput = MinimumPowerPerActiveOutput;
+
+    [SerializeField, Min(MinimumPowerPerActiveOutput)]
+    [Tooltip("Power produced by each output port that is attached to an electrical net.")]
+    private int powerPerActiveOutput = PowerPerConnectedOutput;
+
+    public int PowerPerActiveOutput => powerPerActiveOutput;
+
+    public event Action<int> PowerPerActiveOutputChanged;
 
     protected override void Reset()
     {
+        powerPerActiveOutput = PowerPerConnectedOutput;
         EnsureGeneratorPorts();
         base.Reset();
     }
 
     protected override void OnEnable()
     {
+        powerPerActiveOutput = Mathf.Max(
+            MinimumPowerPerActiveOutput,
+            powerPerActiveOutput);
         EnsureGeneratorPorts();
         base.OnEnable();
     }
 
     protected override void OnValidate()
     {
+        powerPerActiveOutput = Mathf.Max(
+            MinimumPowerPerActiveOutput,
+            powerPerActiveOutput);
         EnsureGeneratorPorts();
         base.OnValidate();
+    }
+
+    /// <summary>
+    /// Changes generator state without calculating or distributing electricity.
+    /// CircuitSystem reads this value during its next normal simulation tick.
+    /// </summary>
+    public void SetPowerPerActiveOutput(int value)
+    {
+        int nextValue = Mathf.Max(MinimumPowerPerActiveOutput, value);
+        if (powerPerActiveOutput == nextValue)
+            return;
+
+        powerPerActiveOutput = nextValue;
+        PowerPerActiveOutputChanged?.Invoke(powerPerActiveOutput);
     }
 
     public int GetPowerOutput(BoardPort port)
@@ -30,7 +63,7 @@ public sealed class GeneratorComponent : BoardComponent, ICircuitPowerSource
         foreach (BoardPort configuredPort in Ports)
         {
             if (ReferenceEquals(configuredPort, port))
-                return PowerPerConnectedOutput;
+                return powerPerActiveOutput;
         }
 
         return 0;

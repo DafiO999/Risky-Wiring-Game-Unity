@@ -245,6 +245,7 @@ MonoBehaviour:
   inputPortColor: {r: 0.04, g: 0.45, b: 1, a: 1}
   outputPortColor: {r: 1, g: 0.35, b: 0.03, a: 1}
   scoreSystem: {fileID: 0}
+  requiredPower: 2
   receivedPower: 0
 --- !u!114 &8900000000000000001
 MonoBehaviour:

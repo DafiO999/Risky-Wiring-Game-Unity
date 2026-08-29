@@ -38,7 +38,10 @@ public sealed class PowerConsumerView : MonoBehaviour
         hasAppliedState = false;
         ScoredPowerConsumerComponent target = ResolveConsumer();
         if (target != null)
+        {
             target.PowerStateChanged += HandlePowerStateChanged;
+            target.RequiredPowerChanged += HandleRequiredPowerChanged;
+        }
 
         EnsureRenderers();
         ApplyState(target != null ? target.PowerState : ConsumerPowerState.Off);
@@ -47,7 +50,10 @@ public sealed class PowerConsumerView : MonoBehaviour
     private void OnDisable()
     {
         if (consumer != null)
+        {
             consumer.PowerStateChanged -= HandlePowerStateChanged;
+            consumer.RequiredPowerChanged -= HandleRequiredPowerChanged;
+        }
     }
 
     private void OnValidate()
@@ -89,6 +95,13 @@ public sealed class PowerConsumerView : MonoBehaviour
     private void HandlePowerStateChanged(ConsumerPowerState state)
     {
         ApplyState(state);
+    }
+
+    private void HandleRequiredPowerChanged(int _)
+    {
+        ApplyState(consumer != null
+            ? consumer.PowerState
+            : ConsumerPowerState.Off);
     }
 
     private ScoredPowerConsumerComponent ResolveConsumer()
