@@ -52,6 +52,11 @@ public sealed class GridBoard : MonoBehaviour
     [Tooltip("Raises runtime grid lines above the board to avoid depth flicker, as a fraction of cell size.")]
     private float gameViewGridHeight = 0.01f;
 
+    [Header("Grid Size Visual")]
+    [SerializeField]
+    [Tooltip("Optional mesh resized to cover the logical grid. Its position, orientation, and thickness are preserved.")]
+    private Transform gridSizeVisual;
+
     [Header("Component Hierarchy")]
     [SerializeField]
     [Tooltip("Object that owns the Components container. If empty, a nearby Display is found automatically.")]
@@ -164,6 +169,7 @@ public sealed class GridBoard : MonoBehaviour
         RebuildOccupancy();
         RefreshWireViews();
         RefreshRuntimeGridView();
+        RefreshGridSizeVisual();
     }
 
     private void OnEnable()
@@ -174,6 +180,7 @@ public sealed class GridBoard : MonoBehaviour
         RebuildOccupancy();
         RefreshWireViews();
         RefreshRuntimeGridView();
+        RefreshGridSizeVisual();
     }
 
     private void OnDisable()
@@ -202,6 +209,7 @@ public sealed class GridBoard : MonoBehaviour
         wireViewsDirty = true;
         if (runtimeGridObject != null)
             RefreshRuntimeGridView();
+        RefreshGridSizeVisual();
         if (topologyResized)
             NotifyTopologyChanged();
     }
@@ -290,7 +298,11 @@ public sealed class GridBoard : MonoBehaviour
         newHeight = Mathf.Max(1, newHeight);
 
         if (width == newWidth && height == newHeight)
+        {
+            RefreshRuntimeGridView();
+            RefreshGridSizeVisual();
             return;
+        }
 
         width = newWidth;
         height = newHeight;
@@ -302,6 +314,7 @@ public sealed class GridBoard : MonoBehaviour
         EnsureOccupancy();
         RefreshWireViews();
         RefreshRuntimeGridView();
+        RefreshGridSizeVisual();
         NotifyTopologyChanged();
     }
 
@@ -1430,6 +1443,152 @@ public sealed class GridBoard : MonoBehaviour
             Vector3.up * (gameViewGridHeight * cellSize);
         UpdateRuntimeGridMaterial();
         UpdateRuntimeGridVisibility();
+    }
+
+    /// <summary>
+    /// Resizes an optional backing/display mesh to the exact world-space size
+    /// of the logical grid without changing its normal-axis thickness.
+    /// </summary>
+    public void RefreshGridSizeVisual()
+    {
+        if (gridSizeVisual == null || gridSizeVisual == transform)
+            return;
+
+        Vector3 widthDirection =
+            transform.TransformVector(Vector3.right).normalized;
+        Vector3 heightDirection =
+            transform.TransformVector(Vector3.forward).normalized;
+        int widthAxis = FindBestAlignedLocalAxis(
+            gridSizeVisual,
+            widthDirection,
+            -1);
+        int heightAxis = FindBestAlignedLocalAxis(
+            gridSizeVisual,
+            heightDirection,
+            widthAxis);
+
+        MeshFilter meshFilter = gridSizeVisual.GetComponent<MeshFilter>();
+        Vector3 meshSize = meshFilter != null && meshFilter.sharedMesh != null
+            ? meshFilter.sharedMesh.bounds.size
+            : Vector3.one;
+        float targetWidth = transform.TransformVector(
+            Vector3.right * (width * cellSize)).magnitude;
+        float targetHeight = transform.TransformVector(
+            Vector3.forward * (height * cellSize)).magnitude;
+
+        Vector3 nextScale = gridSizeVisual.localScale;
+        SetVisualAxisWorldSize(
+            gridSizeVisual,
+            ref nextScale,
+            widthAxis,
+            GetAxis(meshSize, widthAxis),
+            targetWidth);
+        SetVisualAxisWorldSize(
+            gridSizeVisual,
+            ref nextScale,
+            heightAxis,
+            GetAxis(meshSize, heightAxis),
+            targetHeight);
+        gridSizeVisual.localScale = nextScale;
+    }
+
+    private static int FindBestAlignedLocalAxis(
+        Transform target,
+        Vector3 desiredWorldDirection,
+        int excludedAxis)
+    {
+        int bestAxis = 0;
+        float bestAlignment = -1f;
+
+        for (int axis = 0; axis < 3; axis++)
+        {
+            if (axis == excludedAxis)
+                continue;
+
+            Vector3 worldAxis = target.TransformVector(GetAxisVector(axis));
+            float alignment = worldAxis.sqrMagnitude > Mathf.Epsilon
+                ? Mathf.Abs(Vector3.Dot(
+                    worldAxis.normalized,
+                    desiredWorldDirection))
+                : 0f;
+            if (alignment <= bestAlignment)
+                continue;
+
+            bestAlignment = alignment;
+            bestAxis = axis;
+        }
+
+        return bestAxis;
+    }
+
+    private static void SetVisualAxisWorldSize(
+        Transform target,
+        ref Vector3 scale,
+        int axis,
+        float meshAxisSize,
+        float targetWorldSize)
+    {
+        meshAxisSize = Mathf.Max(Mathf.Abs(meshAxisSize), 0.0001f);
+        float currentScale = GetAxis(scale, axis);
+        float scaleSign = currentScale < 0f ? -1f : 1f;
+        Vector3 localAxis = GetAxisVector(axis);
+        float worldUnitsPerScaleUnit;
+
+        if (Mathf.Abs(currentScale) > 0.0001f)
+        {
+            worldUnitsPerScaleUnit =
+                target.TransformVector(localAxis).magnitude /
+                Mathf.Abs(currentScale);
+        }
+        else
+        {
+            Vector3 parentSpaceAxis = target.localRotation * localAxis;
+            worldUnitsPerScaleUnit = target.parent != null
+                ? target.parent.TransformVector(parentSpaceAxis).magnitude
+                : parentSpaceAxis.magnitude;
+        }
+
+        float nextAxisScale = targetWorldSize /
+                              Mathf.Max(
+                                  meshAxisSize * worldUnitsPerScaleUnit,
+                                  0.0001f);
+        SetAxis(ref scale, axis, nextAxisScale * scaleSign);
+    }
+
+    private static Vector3 GetAxisVector(int axis)
+    {
+        return axis switch
+        {
+            0 => Vector3.right,
+            1 => Vector3.up,
+            _ => Vector3.forward
+        };
+    }
+
+    private static float GetAxis(Vector3 value, int axis)
+    {
+        return axis switch
+        {
+            0 => value.x,
+            1 => value.y,
+            _ => value.z
+        };
+    }
+
+    private static void SetAxis(ref Vector3 value, int axis, float axisValue)
+    {
+        switch (axis)
+        {
+            case 0:
+                value.x = axisValue;
+                break;
+            case 1:
+                value.y = axisValue;
+                break;
+            default:
+                value.z = axisValue;
+                break;
+        }
     }
 
     private void EnsureRuntimeGridView()
