@@ -15,9 +15,9 @@ MonoBehaviour:
   id: 3
   UpgradeName: GridSize
   levels:
-  - price: 10
+  - price: 50
     value: 4
-  - price: 15
+  - price: 100
     value: 5
-  - price: 20
+  - price: 200
     value: 5

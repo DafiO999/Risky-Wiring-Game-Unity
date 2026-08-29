@@ -200,7 +200,6 @@ public sealed class RunManager : MonoBehaviour
             return FailStart("RunManager requires a GridBoard through its RunGenerator.");
 
         targetBoard.SetGameplayInputEnabled(false);
-        targetScoreSystem.ResetScore();
         targetGenerator.ClearBoard();
         targetCircuitSystem.ResetCircuitState();
         targetBoard.SetSize(

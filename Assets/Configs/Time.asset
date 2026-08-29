@@ -15,9 +15,9 @@ MonoBehaviour:
   id: 0
   UpgradeName: Time
   levels:
-  - price: 10
+  - price: 50
     value: 2
-  - price: 15
+  - price: 100
     value: 3
-  - price: 20
+  - price: 200
     value: 4

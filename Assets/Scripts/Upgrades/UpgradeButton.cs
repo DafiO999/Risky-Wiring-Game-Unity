@@ -27,6 +27,12 @@ public class UpgradeButton : MonoBehaviour, IPointerEnterHandler
     [SerializeField]
     private string description;
 
+    [SerializeField]
+    private Highlight highlight;
+
+    [SerializeField]
+    private InteractionHighlight interactionHighlight;
+
     private void Start()
     {
         Refresh();
@@ -48,12 +54,16 @@ public class UpgradeButton : MonoBehaviour, IPointerEnterHandler
         {
             priceText.text = "Max Level";
             upgradeButton.interactable = false;
+            highlight.enabled = false;
+            interactionHighlight.enabled = false;
         }
         else
         {
             int nextPrice = shopController.GetNextPrice(upgradeId);
             priceText.text = $"Price: {nextPrice}";
             upgradeButton.interactable = true;
+            highlight.enabled = true;
+            interactionHighlight.enabled = true;
         }
     }
 
