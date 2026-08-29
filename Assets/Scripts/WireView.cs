@@ -93,10 +93,13 @@ public sealed class WireView : MonoBehaviour
         bool wasPowered = IsPowered;
         netId = circuitNetId;
         availablePower = Mathf.Max(0, netAvailablePower);
-        ApplyPowerVisual();
 
-        if (IsPowered != wasPowered)
-            PowerStateChanged?.Invoke(IsPowered);
+        bool isPowered = IsPowered;
+        if (isPowered == wasPowered)
+            return;
+
+        ApplyPowerVisual();
+        PowerStateChanged?.Invoke(isPowered);
     }
 
     public bool IsArmActive(WireConnection direction)

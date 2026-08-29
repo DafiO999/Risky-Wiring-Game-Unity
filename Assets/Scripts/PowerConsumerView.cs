@@ -28,12 +28,14 @@ public sealed class PowerConsumerView : MonoBehaviour
     private Color overloadedColor = new(1f, 0.12f, 0.08f, 1f);
 
     private MaterialPropertyBlock propertyBlock;
+    private bool hasAppliedState;
 
     public ScoredPowerConsumerComponent Consumer => ResolveConsumer();
     public ConsumerPowerState DisplayedState { get; private set; }
 
     private void OnEnable()
     {
+        hasAppliedState = false;
         ScoredPowerConsumerComponent target = ResolveConsumer();
         if (target != null)
             target.PowerStateChanged += HandlePowerStateChanged;
@@ -50,6 +52,7 @@ public sealed class PowerConsumerView : MonoBehaviour
 
     private void OnValidate()
     {
+        hasAppliedState = false;
         ResolveConsumer();
         EnsureRenderers();
         ApplyState(consumer != null ? consumer.PowerState : ConsumerPowerState.Off);
@@ -57,7 +60,11 @@ public sealed class PowerConsumerView : MonoBehaviour
 
     public void ApplyState(ConsumerPowerState state)
     {
+        if (hasAppliedState && DisplayedState == state)
+            return;
+
         DisplayedState = state;
+        hasAppliedState = true;
         Color color = state switch
         {
             ConsumerPowerState.Underpowered => underpoweredColor,

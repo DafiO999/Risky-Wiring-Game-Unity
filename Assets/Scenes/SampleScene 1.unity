@@ -2730,7 +2730,7 @@ MonoBehaviour:
   rotationSpeed: 720
   minimumRounds: 2
   maximumRounds: 4
-  gridSizes: 06000000070000000800000009000000
+  gridSizes: 0a000000070000000800000009000000
   difficulties: 01000000040000000600000008000000
   times:
   - 30

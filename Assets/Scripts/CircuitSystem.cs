@@ -142,6 +142,11 @@ public sealed class CircuitSystem : MonoBehaviour
     private readonly Dictionary<CircuitNet, int> availablePowerBuffer = new();
     private readonly List<ScoredPowerConsumerComponent> scoreRateBuffer = new();
     private readonly HashSet<ScoredPowerConsumerComponent> scoreRateSet = new();
+    private readonly Dictionary<BoardComponent, BoardPort> pendingConsumerResets = new();
+    private readonly HashSet<BoardComponent> currentConsumerComponents = new();
+    private readonly HashSet<BoardComponent> pendingPowerParticipantResets = new();
+    private readonly HashSet<WireView> pendingWireVisualResets = new();
+    private readonly HashSet<WireView> currentWireViews = new();
 
     private GridBoard subscribedBoard;
     private bool topologyDirty = true;
@@ -202,9 +207,8 @@ public sealed class CircuitSystem : MonoBehaviour
 
     private void OnDisable()
     {
-        ResetPreviousPowerParticipants();
-        ResetPreviousConsumers();
-        ResetWireVisualStates();
+        StagePreviousTopologyState();
+        ResetAllStagedState();
         tickAccumulator = 0d;
         UnbindBoard();
     }
@@ -281,6 +285,7 @@ public sealed class CircuitSystem : MonoBehaviour
 
         ClearPower();
         GatherPowerTickParticipants();
+        ResetStalePowerParticipants();
 
         foreach (ICircuitPowerTick participant in powerTickBuffer)
             participant.BeginPowerTick(deltaTime);
@@ -313,8 +318,7 @@ public sealed class CircuitSystem : MonoBehaviour
             ? targetBoard.TopologyRevision
             : -1;
         rebuildCount++;
-        ResetPreviousPowerParticipants();
-        ResetPreviousConsumers();
+        StagePreviousTopologyState();
         nets.Clear();
         wireNets.Clear();
         portNets.Clear();
@@ -369,7 +373,6 @@ public sealed class CircuitSystem : MonoBehaviour
 
         AttachPorts(targetBoard);
         ClearPower();
-        UpdateWireVisualStates();
         TopologyRebuilt?.Invoke();
     }
 
@@ -565,6 +568,8 @@ public sealed class CircuitSystem : MonoBehaviour
 
     private void ApplyConsumerReceivedPower()
     {
+        currentConsumerComponents.Clear();
+
         foreach (CircuitNet net in nets)
         {
             foreach (CircuitPortAttachment attachment in net.Ports)
@@ -573,12 +578,15 @@ public sealed class CircuitSystem : MonoBehaviour
                     attachment.Component is ICircuitPowerConsumer consumer &&
                     attachment.Component is not BatteryComponent)
                 {
+                    currentConsumerComponents.Add(attachment.Component);
                     consumer.SetReceivedPower(
                         attachment.Port,
                         attachment.ReceivedPower);
                 }
             }
         }
+
+        ResetStaleConsumers();
     }
 
     private void CalculateScoreRates()
@@ -605,35 +613,65 @@ public sealed class CircuitSystem : MonoBehaviour
     private void UpdateWireVisualStates()
     {
         GridBoard targetBoard = Board;
-        if (targetBoard == null)
-            return;
+        currentWireViews.Clear();
 
+        if (targetBoard != null)
+        {
+            foreach (CircuitNet net in nets)
+            {
+                foreach (Vector2Int wireCell in net.WireCells)
+                {
+                    WireView view = targetBoard.GetWireView(wireCell);
+                    if (view != null)
+                    {
+                        currentWireViews.Add(view);
+                        view.SetPowerState(
+                            net.NetId,
+                            net.AvailablePower);
+                    }
+                }
+            }
+        }
+
+        foreach (WireView view in pendingWireVisualResets)
+        {
+            if (view != null && !currentWireViews.Contains(view))
+                view.SetPowerState(NoNetId, 0);
+        }
+
+        pendingWireVisualResets.Clear();
+    }
+
+    private void StagePreviousTopologyState()
+    {
+        GridBoard targetBoard = ResolveBoard();
         foreach (CircuitNet net in nets)
         {
+            foreach (CircuitPortAttachment attachment in net.Ports)
+            {
+                BoardComponent component = attachment.Component;
+                if (component == null)
+                    continue;
+
+                if (component is ICircuitPowerConsumer &&
+                    component is not BatteryComponent)
+                {
+                    pendingConsumerResets[component] = attachment.Port;
+                }
+
+                if (component is ICircuitPowerTick)
+                    pendingPowerParticipantResets.Add(component);
+            }
+
+            if (targetBoard == null)
+                continue;
+
             foreach (Vector2Int wireCell in net.WireCells)
             {
                 WireView view = targetBoard.GetWireView(wireCell);
                 if (view != null)
-                {
-                    view.SetPowerState(
-                        net.NetId,
-                        net.AvailablePower);
-                }
+                    pendingWireVisualResets.Add(view);
             }
-        }
-    }
-
-    private void ResetWireVisualStates()
-    {
-        GridBoard targetBoard = ResolveBoard();
-        if (targetBoard == null)
-            return;
-
-        foreach (Vector2Int wireCell in targetBoard.WireCells)
-        {
-            WireView view = targetBoard.GetWireView(wireCell);
-            if (view != null)
-                view.SetPowerState(NoNetId, 0);
         }
     }
 
@@ -656,39 +694,73 @@ public sealed class CircuitSystem : MonoBehaviour
         }
     }
 
-    private void ResetPreviousPowerParticipants()
+    private void ResetStalePowerParticipants()
     {
-        GatherPowerTickParticipants();
-
-        foreach (ICircuitPowerTick participant in powerTickBuffer)
-            participant.ResetPowerState();
-    }
-
-    private void ResetPreviousConsumers()
-    {
-        scoreRateBuffer.Clear();
-        scoreRateSet.Clear();
-
-        foreach (CircuitNet net in nets)
+        foreach (BoardComponent component in pendingPowerParticipantResets)
         {
-            foreach (CircuitPortAttachment attachment in net.Ports)
+            if (component != null &&
+                component is ICircuitPowerTick participant &&
+                !powerTickSet.Contains(participant))
             {
-                if (attachment.Component != null &&
-                    attachment.Component is ICircuitPowerConsumer consumer)
-                {
-                    consumer.SetReceivedPower(attachment.Port, 0);
-
-                    if (attachment.Component is ScoredPowerConsumerComponent scoredConsumer &&
-                        scoreRateSet.Add(scoredConsumer))
-                    {
-                        scoreRateBuffer.Add(scoredConsumer);
-                    }
-                }
+                participant.ResetPowerState();
             }
         }
 
-        foreach (ScoredPowerConsumerComponent consumer in scoreRateBuffer)
-            consumer.RefreshScoreRateReport();
+        pendingPowerParticipantResets.Clear();
+    }
+
+    private void ResetStaleConsumers()
+    {
+        foreach (KeyValuePair<BoardComponent, BoardPort> entry in pendingConsumerResets)
+        {
+            BoardComponent component = entry.Key;
+            if (component == null || currentConsumerComponents.Contains(component))
+                continue;
+
+            if (component is ICircuitPowerConsumer consumer)
+                consumer.SetReceivedPower(entry.Value, 0);
+
+            if (component is ScoredPowerConsumerComponent scoredConsumer)
+                scoredConsumer.RefreshScoreRateReport();
+        }
+
+        pendingConsumerResets.Clear();
+    }
+
+    private void ResetAllStagedState()
+    {
+        foreach (BoardComponent component in pendingPowerParticipantResets)
+        {
+            if (component != null && component is ICircuitPowerTick participant)
+                participant.ResetPowerState();
+        }
+
+        pendingPowerParticipantResets.Clear();
+
+        foreach (KeyValuePair<BoardComponent, BoardPort> entry in pendingConsumerResets)
+        {
+            BoardComponent component = entry.Key;
+            if (component == null)
+                continue;
+
+            if (component is ICircuitPowerConsumer consumer)
+                consumer.SetReceivedPower(entry.Value, 0);
+
+            if (component is ScoredPowerConsumerComponent scoredConsumer)
+                scoredConsumer.RefreshScoreRateReport();
+        }
+
+        pendingConsumerResets.Clear();
+
+        foreach (WireView view in pendingWireVisualResets)
+        {
+            if (view != null)
+                view.SetPowerState(NoNetId, 0);
+        }
+
+        pendingWireVisualResets.Clear();
+        currentConsumerComponents.Clear();
+        currentWireViews.Clear();
     }
 
     private static int FindPortIndex(BoardComponent component, BoardPort port)

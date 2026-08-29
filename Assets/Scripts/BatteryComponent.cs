@@ -41,6 +41,8 @@ public sealed class BatteryComponent :
     private float tickDuration;
     private bool powerTickActive;
     private bool outputWasConnectedThisTick;
+    private int receivedInputPowerBeforeTick;
+    private int providedOutputPowerBeforeTick;
 
     public float Charge => charge;
     public float Capacity => capacity;
@@ -105,25 +107,28 @@ public sealed class BatteryComponent :
 
     public void SetCapacity(float value)
     {
-        capacity = Mathf.Max(0f, value);
-        SetCharge(charge);
+        float nextCapacity = Mathf.Max(0f, value);
+        bool capacityChanged = !Mathf.Approximately(capacity, nextCapacity);
+        capacity = nextCapacity;
+        bool chargeChanged = SetChargeInternal(charge);
+
+        if (capacityChanged || chargeChanged)
+            StateChanged?.Invoke();
     }
 
     public void SetCharge(float value)
     {
-        float clampedCharge = Mathf.Clamp(value, 0f, capacity);
-        if (!Mathf.Approximately(charge, clampedCharge))
-        {
-            charge = clampedCharge;
-            ChargeChanged?.Invoke(charge);
-        }
-
-        StateChanged?.Invoke();
+        if (SetChargeInternal(value))
+            StateChanged?.Invoke();
     }
 
     public void SetOutputPower(int value)
     {
-        outputPower = Mathf.Max(0, value);
+        int nextOutputPower = Mathf.Max(0, value);
+        if (outputPower == nextOutputPower)
+            return;
+
+        outputPower = nextOutputPower;
         StateChanged?.Invoke();
     }
 
@@ -162,6 +167,8 @@ public sealed class BatteryComponent :
 
     public void BeginPowerTick(float deltaTime)
     {
+        receivedInputPowerBeforeTick = receivedInputPower;
+        providedOutputPowerBeforeTick = providedOutputPower;
         ResetPowerStateInternal(false);
         powerTickActive = true;
         tickDuration = Mathf.Max(0f, deltaTime);
@@ -180,7 +187,13 @@ public sealed class BatteryComponent :
         float chargeAfterInput = chargeAfterOutput + receivedInputPower * deltaTime;
         powerTickActive = false;
         tickDuration = 0f;
-        SetCharge(chargeAfterInput);
+        bool chargeChanged = SetChargeInternal(chargeAfterInput);
+        bool powerChanged =
+            receivedInputPowerBeforeTick != receivedInputPower ||
+            providedOutputPowerBeforeTick != providedOutputPower;
+
+        if (chargeChanged || powerChanged)
+            StateChanged?.Invoke();
     }
 
     public void ResetPowerState()
@@ -190,6 +203,7 @@ public sealed class BatteryComponent :
 
     private void ResetPowerStateInternal(bool notifyStateChanged)
     {
+        bool powerChanged = receivedInputPower != 0 || providedOutputPower != 0;
         tickStartCharge = charge;
         tickDuration = 0f;
         receivedInputPower = 0;
@@ -197,8 +211,19 @@ public sealed class BatteryComponent :
         outputWasConnectedThisTick = false;
         powerTickActive = false;
 
-        if (notifyStateChanged)
+        if (notifyStateChanged && powerChanged)
             StateChanged?.Invoke();
+    }
+
+    private bool SetChargeInternal(float value)
+    {
+        float clampedCharge = Mathf.Clamp(value, 0f, capacity);
+        if (Mathf.Approximately(charge, clampedCharge))
+            return false;
+
+        charge = clampedCharge;
+        ChargeChanged?.Invoke(charge);
+        return true;
     }
 
     private float GetProjectedChargeBeforeInput()
