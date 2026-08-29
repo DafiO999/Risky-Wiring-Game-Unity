@@ -896,8 +896,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.09229593, y: 0.7010574, z: -0.09229593, w: 0.7010574}
-  m_LocalPosition: {x: 0.66, y: 4.86, z: -21.07}
+  m_LocalRotation: {x: 0.13052605, y: 0, z: 0, w: 0.99144495}
+  m_LocalPosition: {x: 0.66, y: 4.86, z: -12.98}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4750,7 +4750,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera
   Priority:
     Enabled: 1
-    m_Value: 59
+    m_Value: 155
   OutputChannel: 1
   StandbyUpdate: 2
   m_StreamingVersion: 20241001
@@ -4835,41 +4835,26 @@ MonoBehaviour:
     chaosValue: 3
     seed: 13687
   startAutomatically: 0
-  slotMachine: {fileID: 0}
+  slotMachine: {fileID: 1084983363}
   runGenerator: {fileID: 1438351355}
-  scoreSystem: {fileID: 0}
+  scoreSystem: {fileID: 1714033401}
   chaosController: {fileID: 1438351359}
   circuitSystem: {fileID: 1438351357}
   onRunEnd:
     m_PersistentCalls:
-      m_Calls: []
---- !u!114 &1438351359
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1438351352}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8f65c98e14cd4b2f932549712c51ee64, type: 3}
-  m_Name: ''
-  m_EditorClassIdentifier: Assembly-CSharp::ChaosController
-  board: {fileID: 1438351358}
-  runGenerator: {fileID: 1438351355}
-  circuitSystem: {fileID: 1438351357}
-  lowChaosInterval: 18
-  highChaosInterval: 4
-  intervalJitter: 0.25
-  maximumWireFaultCells: 4
-  maximumBatteryTargets: 3
-  minimumBatterySwing: 0.1
-  maximumBatterySwing: 0.5
-  maximumGeneratorTargets: 3
-  maximumGeneratorPowerAtFullChaos: 6
-  maximumConsumerTargets: 3
-  maximumConsumerRequiredPowerAtFullChaos: 6
-  maximumConsumerRemovals: 2
+      m_Calls:
+      - m_Target: {fileID: 1882473376}
+        m_TargetAssemblyTypeName: CameraSwitch, Assembly-CSharp
+        m_MethodName: SwitchToGamba
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1438351355
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5000,8 +4985,8 @@ MonoBehaviour:
   toggleKey: 96
   board: {fileID: 1438351358}
   circuitSystem: {fileID: 1438351357}
-  scoreSystem: {fileID: 0}
-  pointerCamera: {fileID: 0}
+  scoreSystem: {fileID: 1714033401}
+  pointerCamera: {fileID: 330585545}
   screenOffset: {x: 12, y: 12}
   panelWidth: 420
   fontSize: 14
@@ -5045,7 +5030,7 @@ MonoBehaviour:
   displayRoot: {fileID: 1505345567}
   componentsRoot: {fileID: 353276158}
   enableWirePlacement: 1
-  wirePlacementCamera: {fileID: 0}
+  wirePlacementCamera: {fileID: 330585545}
   wireViewPrefab: {fileID: 3419322242394735718, guid: df5ffd245d4fd8249a191334e9540ecd, type: 3}
   wireViewsRoot: {fileID: 0}
   wireViewHeight: 0.04
@@ -5053,6 +5038,33 @@ MonoBehaviour:
   wireColor: {r: 1, g: 0.8, b: 0.1, a: 1}
   wireGizmoHeight: 0.02
   wireGizmoNodeSize: 0.06
+--- !u!114 &1438351359
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1438351352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f65c98e14cd4b2f932549712c51ee64, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChaosController
+  board: {fileID: 1438351358}
+  runGenerator: {fileID: 1438351355}
+  circuitSystem: {fileID: 1438351357}
+  lowChaosInterval: 18
+  highChaosInterval: 4
+  intervalJitter: 0.25
+  maximumWireFaultCells: 4
+  maximumBatteryTargets: 3
+  minimumBatterySwing: 0.1
+  maximumBatterySwing: 0.5
+  maximumGeneratorTargets: 3
+  maximumGeneratorPowerAtFullChaos: 6
+  maximumConsumerTargets: 3
+  maximumConsumerRequiredPowerAtFullChaos: 6
+  maximumConsumerRemovals: 2
 --- !u!1 &1505345566
 GameObject:
   m_ObjectHideFlags: 0

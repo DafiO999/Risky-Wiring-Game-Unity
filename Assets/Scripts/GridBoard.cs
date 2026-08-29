@@ -713,6 +713,19 @@ public sealed class GridBoard : MonoBehaviour
         int rotationSteps,
         out string failureReason)
     {
+        if (component == null)
+        {
+            failureReason = "A BoardComponent reference is required.";
+            return false;
+        }
+
+        if (component.gameObject.scene != gameObject.scene)
+        {
+            failureReason =
+                "A BoardComponent and GridBoard must belong to the same scene or prefab stage.";
+            return false;
+        }
+
         EnsureOccupancy();
         EnsureWireStorage();
 

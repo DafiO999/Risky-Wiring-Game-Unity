@@ -83,8 +83,12 @@ public class BoardComponent : MonoBehaviour
         if (isApplyingPlacement)
             return;
 
-        if (board == null)
+        if (!IsBoardInSameScene(board))
+        {
+            board = null;
+            isPlaced = false;
             board = FindBoardForTransform();
+        }
 
         if (board != null)
             board.TryPlaceComponent(this, gridPosition, RotationSteps);
@@ -355,15 +359,27 @@ public class BoardComponent : MonoBehaviour
     private GridBoard FindBoardForTransform()
     {
         GridBoard parentBoard = GetComponentInParent<GridBoard>();
-        if (parentBoard != null)
+        if (IsBoardInSameScene(parentBoard))
             return parentBoard;
 
         GridBoard[] boards = FindObjectsByType<GridBoard>(
             FindObjectsInactive.Include,
             FindObjectsSortMode.None);
+        GridBoard onlyBoardInSameScene = null;
+        int boardsInSameScene = 0;
 
         foreach (GridBoard candidate in boards)
         {
+            // Prefab Mode uses a separate preview scene. Never associate a
+            // prefab-stage component with a GridBoard from the main scene:
+            // TryPlaceComponent reparents objects, which would corrupt both
+            // stages and make the scene hierarchy disappear until a reload.
+            if (!IsBoardInSameScene(candidate))
+                continue;
+
+            onlyBoardInSameScene = candidate;
+            boardsInSameScene++;
+
             Transform candidateComponents = candidate.ComponentsRoot;
             if (candidateComponents != null && transform.IsChildOf(candidateComponents))
                 return candidate;
@@ -373,6 +389,12 @@ public class BoardComponent : MonoBehaviour
                 return candidate;
         }
 
-        return boards.Length == 1 ? boards[0] : null;
+        return boardsInSameScene == 1 ? onlyBoardInSameScene : null;
+    }
+
+    private bool IsBoardInSameScene(GridBoard candidate)
+    {
+        return candidate != null &&
+               candidate.gameObject.scene == gameObject.scene;
     }
 }
