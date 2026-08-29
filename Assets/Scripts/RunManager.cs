@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -33,6 +34,11 @@ public sealed class RunManager : MonoBehaviour
     [Tooltip("Electricity simulation reset and paused when a run ends.")]
     private CircuitSystem circuitSystem;
 
+    [Header("UI")]
+    [SerializeField]
+    [Tooltip("Optional text that displays the authoritative run time remaining as MM:SS.")]
+    private TMP_Text timerText;
+
     [Header("Events")]
     [SerializeField]
     [Tooltip("Invoked after a completed run has stopped and the Display board and circuit have been cleared.")]
@@ -41,6 +47,7 @@ public sealed class RunManager : MonoBehaviour
     private SlotMachineController subscribedSlotMachine;
     private bool isRunning;
     private float remainingTime;
+    private int displayedWholeSeconds = int.MinValue;
     private string lastStartFailureReason;
 
     public RunSettings Settings => ResolveSettings();
@@ -48,6 +55,7 @@ public sealed class RunManager : MonoBehaviour
     public ScoreSystem ScoreSystem => ResolveScoreSystem();
     public ChaosController ChaosController => ResolveChaosController();
     public CircuitSystem CircuitSystem => ResolveCircuitSystem();
+    public TMP_Text TimerText => timerText;
     public UnityEvent OnRunEnd => onRunEnd;
     public bool IsRunning => isRunning;
     public float RemainingTime => remainingTime;
@@ -73,12 +81,14 @@ public sealed class RunManager : MonoBehaviour
         BindSlotMachine();
         if (!isRunning)
             StopGameplayUpdates(clearBoard: false);
+        RefreshTimerText(force: true);
     }
 
     private void OnValidate()
     {
         ResolveSettings().Validate();
         remainingTime = Mathf.Max(0f, remainingTime);
+        RefreshTimerText(force: true);
     }
 
     private void Start()
@@ -209,6 +219,7 @@ public sealed class RunManager : MonoBehaviour
 
         remainingTime = currentSettings.Duration;
         isRunning = true;
+        RefreshTimerText(force: true);
         targetBoard.SetGameplayInputEnabled(true);
         targetCircuitSystem.MarkTopologyDirty();
         targetCircuitSystem.SetSimulationEnabled(true);
@@ -234,7 +245,12 @@ public sealed class RunManager : MonoBehaviour
 
         remainingTime = Mathf.Max(0f, remainingTime - deltaTime);
         if (remainingTime <= 0f)
+        {
             EndRun();
+            return;
+        }
+
+        RefreshTimerText(force: false);
     }
 
     [ContextMenu("End Run")]
@@ -243,6 +259,7 @@ public sealed class RunManager : MonoBehaviour
         bool invokeRunEnded = isRunning;
         isRunning = false;
         remainingTime = 0f;
+        RefreshTimerText(force: true);
         StopGameplayUpdates(clearBoard: true);
 
         if (invokeRunEnded)
@@ -376,10 +393,26 @@ public sealed class RunManager : MonoBehaviour
         return nextSeed;
     }
 
+    private void RefreshTimerText(bool force)
+    {
+        int wholeSeconds = Mathf.CeilToInt(Mathf.Max(0f, remainingTime));
+        if (!force && displayedWholeSeconds == wholeSeconds)
+            return;
+
+        displayedWholeSeconds = wholeSeconds;
+        if (timerText == null)
+            return;
+
+        int minutes = wholeSeconds / 60;
+        int seconds = wholeSeconds % 60;
+        timerText.text = $"{minutes:00}:{seconds:00}";
+    }
+
     private bool FailStart(string reason)
     {
         isRunning = false;
         remainingTime = 0f;
+        RefreshTimerText(force: true);
         lastStartFailureReason = reason;
         StopGameplayUpdates(clearBoard: true);
         Debug.LogError(reason, this);

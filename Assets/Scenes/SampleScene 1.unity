@@ -1757,13 +1757,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 410087039}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
-  m_LocalPosition: {x: 0, y: 3, z: 0}
+  m_LocalRotation: {x: 0.21287541, y: -0.36272353, z: 0.18834585, w: 0.8874917}
+  m_LocalPosition: {x: 0, y: 3, z: -44.64}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+  m_LocalEulerAnglesHint: {x: 30.963, y: -41.095, z: 12.109}
 --- !u!114 &410087042
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3194,12 +3194,12 @@ MonoBehaviour:
   - {x: 8, y: 7}
   - {x: 9, y: 8}
   - {x: 10, y: 9}
-  difficulties: 01000000040000000600000008000000
+  difficulties: 010000000200000003000000040000000500000006000000070000000800000009000000
   times:
+  - 15
   - 30
+  - 45
   - 60
-  - 90
-  - 120
   chaosValues: 0000000003000000060000000a000000
   gridSizeResultText: {fileID: 340731736}
   difficultyResultText: {fileID: 1322506446}
@@ -4554,7 +4554,7 @@ MonoBehaviour:
       - m_Target: {fileID: 1882473376}
         m_TargetAssemblyTypeName: CameraSwitch, Assembly-CSharp
         m_MethodName: SwitchToGamba
-        m_Mode: 1
+        m_Mode: 4
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -4840,20 +4840,33 @@ MonoBehaviour:
   scoreSystem: {fileID: 1714033401}
   chaosController: {fileID: 1438351359}
   circuitSystem: {fileID: 1438351357}
+  timerText: {fileID: 2006026532}
   onRunEnd:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 1882473376}
         m_TargetAssemblyTypeName: CameraSwitch, Assembly-CSharp
         m_MethodName: SwitchToGamba
-        m_Mode: 1
+        m_Mode: 4
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
-          m_FloatArgument: 0
+          m_FloatArgument: 1
           m_StringArgument: 
           m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 357685718}
+        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
+        m_MethodName: SetActive
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 1
+          m_StringArgument: 
+          m_BoolArgument: 1
         m_CallState: 2
 --- !u!114 &1438351355
 MonoBehaviour:
@@ -5056,7 +5069,6 @@ MonoBehaviour:
   lowChaosInterval: 18
   highChaosInterval: 4
   intervalJitter: 0.25
-  maximumWireFaultCells: 4
   maximumBatteryTargets: 3
   minimumBatterySwing: 0.1
   maximumBatterySwing: 0.5
@@ -5065,6 +5077,8 @@ MonoBehaviour:
   maximumConsumerTargets: 3
   maximumConsumerRequiredPowerAtFullChaos: 6
   maximumConsumerRemovals: 2
+  maximumConsumerRespawns: 2
+  maximumConsumerRespawnEventWeight: 4
 --- !u!1 &1505345566
 GameObject:
   m_ObjectHideFlags: 0
@@ -7117,9 +7131,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '00:00
-
-'
+  m_text: 00:00
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

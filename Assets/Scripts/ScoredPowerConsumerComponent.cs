@@ -71,7 +71,7 @@ public abstract class ScoredPowerConsumerComponent :
     }
 
     public int ScorePerSecond => receivedPower == requiredPower
-        ? 1
+        ? 10
         : receivedPower > requiredPower
             ? -1
             : 0;

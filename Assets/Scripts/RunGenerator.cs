@@ -42,6 +42,8 @@ public struct RunComponentCounts
 [RequireComponent(typeof(GridBoard))]
 public sealed class RunGenerator : MonoBehaviour
 {
+    private const int MinimumConsumerCount = 1;
+
     private static readonly Vector2Int[] CardinalCellOffsets =
     {
         Vector2Int.up,
@@ -108,6 +110,7 @@ public sealed class RunGenerator : MonoBehaviour
     private int boardRegenerationAttempts = 12;
 
     private readonly List<BoardComponent> generatedComponents = new();
+    private readonly List<BoardComponent> inactiveGeneratedComponents = new();
     private readonly List<ComponentKind> componentKinds = new();
     private readonly List<PlacementCandidate> placementCandidates = new();
     private readonly HashSet<Vector2Int> reservedPortCells = new();
@@ -121,6 +124,21 @@ public sealed class RunGenerator : MonoBehaviour
     public DifficultyProfile Profile => ResolveProfile();
     public RunComponentCounts LastGeneratedCounts => lastGeneratedCounts;
     public IReadOnlyList<BoardComponent> GeneratedComponents => generatedComponents;
+    public IReadOnlyList<BoardComponent> InactiveGeneratedComponents =>
+        inactiveGeneratedComponents;
+    public bool HasInactiveGeneratedComponents
+    {
+        get
+        {
+            foreach (BoardComponent component in inactiveGeneratedComponents)
+            {
+                if (component != null)
+                    return true;
+            }
+
+            return false;
+        }
+    }
     public IReadOnlyCollection<Vector2Int> ReservedPortCells => reservedPortCells;
     public string LastFailureReason => lastFailureReason;
 
@@ -270,6 +288,7 @@ public sealed class RunGenerator : MonoBehaviour
     {
         GridBoard targetBoard = ResolveBoard();
         generatedComponents.Clear();
+        inactiveGeneratedComponents.Clear();
         reservedPortCells.Clear();
         lastFailureReason = string.Empty;
         lastGeneratedCounts = default;
@@ -292,20 +311,132 @@ public sealed class RunGenerator : MonoBehaviour
     }
 
     /// <summary>
-    /// Removes one runtime-generated component through the same ownership,
-    /// placement, topology, and destruction lifecycle used by run cleanup.
+    /// Removes one runtime-generated component from the board. Generated Lamps
+    /// and Fans remain owned in an inactive pool so chaos can respawn them.
+    /// Other generated component types retain the previous destroy behavior.
     /// </summary>
     public bool RemoveGeneratedComponent(BoardComponent component)
     {
-        if (component == null || !generatedComponents.Remove(component))
+        if (component == null || !generatedComponents.Contains(component))
             return false;
 
         GridBoard targetBoard = ResolveBoard();
-        DestroyComponentObject(component);
+        if (component is ScoredPowerConsumerComponent &&
+            CountActiveConsumers(targetBoard) <= MinimumConsumerCount)
+        {
+            return false;
+        }
+
+        generatedComponents.Remove(component);
+        if (component is LampComponent or FanComponent)
+        {
+            component.gameObject.SetActive(false);
+            component.ClearPlacement();
+            inactiveGeneratedComponents.Add(component);
+        }
+        else
+        {
+            DestroyComponentObject(component);
+        }
 
         if (targetBoard != null)
             RebuildReservedPortCells(targetBoard);
 
+        lastGeneratedCounts = CountGeneratedComponents();
+        return true;
+    }
+
+    /// <summary>
+    /// Randomly returns one inactive generated Lamp or Fan to any safe board
+    /// pose. A different pose than its previous one is preferred when possible.
+    /// </summary>
+    public bool TryRespawnGeneratedComponent(System.Random random)
+    {
+        inactiveGeneratedComponents.RemoveAll(component => component == null);
+        GridBoard targetBoard = ResolveBoard();
+        if (targetBoard == null || random == null ||
+            inactiveGeneratedComponents.Count == 0)
+        {
+            return false;
+        }
+
+        RebuildReservedPortCells(targetBoard);
+        BuildPlacementCandidates(targetBoard);
+        Shuffle(placementCandidates, random);
+
+        int firstComponentIndex = random.Next(inactiveGeneratedComponents.Count);
+        for (int componentOffset = 0;
+             componentOffset < inactiveGeneratedComponents.Count;
+             componentOffset++)
+        {
+            int componentIndex =
+                (firstComponentIndex + componentOffset) %
+                inactiveGeneratedComponents.Count;
+            BoardComponent component = inactiveGeneratedComponents[componentIndex];
+            if (component == null)
+                continue;
+
+            for (int posePass = 0; posePass < 2; posePass++)
+            {
+                foreach (PlacementCandidate candidate in placementCandidates)
+                {
+                    bool isPreviousPose =
+                        candidate.Position == component.GridPosition &&
+                        candidate.RotationSteps == component.RotationSteps;
+                    if ((posePass == 0 && isPreviousPose) ||
+                        (posePass == 1 && !isPreviousPose))
+                    {
+                        continue;
+                    }
+
+                    if (TryRespawnGeneratedComponent(
+                            component,
+                            candidate.Position,
+                            candidate.RotationSteps))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Returns a specific inactive generated Lamp or Fan at the requested pose.
+    /// Wires in the accepted 2x2 footprint are removed before placement.
+    /// </summary>
+    public bool TryRespawnGeneratedComponent(
+        BoardComponent component,
+        Vector2Int position,
+        int rotationSteps)
+    {
+        GridBoard targetBoard = ResolveBoard();
+        if (targetBoard == null || component == null ||
+            !inactiveGeneratedComponents.Contains(component) ||
+            !CanPlaceWithPortClearance(
+                component,
+                targetBoard,
+                position,
+                rotationSteps,
+                allowWiresInFootprint: true,
+                out List<Vector2Int> portCells) ||
+            !targetBoard.TryPlaceComponentClearingWires(
+                component,
+                position,
+                rotationSteps,
+                out _))
+        {
+            return false;
+        }
+
+        inactiveGeneratedComponents.Remove(component);
+        generatedComponents.Add(component);
+        foreach (Vector2Int portCell in portCells)
+            reservedPortCells.Add(portCell);
+
+        component.gameObject.SetActive(true);
         lastGeneratedCounts = CountGeneratedComponents();
         return true;
     }
@@ -329,6 +460,7 @@ public sealed class RunGenerator : MonoBehaviour
                     targetBoard,
                     candidate.Position,
                     candidate.RotationSteps,
+                    allowWiresInFootprint: false,
                     out List<Vector2Int> portCells))
             {
                 continue;
@@ -358,15 +490,23 @@ public sealed class RunGenerator : MonoBehaviour
         GridBoard targetBoard,
         Vector2Int position,
         int rotationSteps,
+        bool allowWiresInFootprint,
         out List<Vector2Int> portCells)
     {
         portCells = new List<Vector2Int>(component.Ports.Count);
 
-        if (!targetBoard.CanPlaceComponent(
+        bool canPlace = allowWiresInFootprint
+            ? targetBoard.CanPlaceComponentAfterClearingWires(
                 component,
                 position,
                 rotationSteps,
-                out _))
+                out _)
+            : targetBoard.CanPlaceComponent(
+                component,
+                position,
+                rotationSteps,
+                out _);
+        if (!canPlace)
         {
             return false;
         }
@@ -413,12 +553,18 @@ public sealed class RunGenerator : MonoBehaviour
     {
         HashSet<Vector2Int> reachableCells =
             BuildGeneratorReachableCells(targetBoard);
+        bool foundConsumer = false;
 
         foreach (BoardComponent component in generatedComponents)
         {
             if (component is not ScoredPowerConsumerComponent ||
-                !component.IsPlaced ||
-                AreAllConsumerInputsReachable(
+                !component.IsPlaced)
+            {
+                continue;
+            }
+
+            foundConsumer = true;
+            if (AreAllConsumerInputsReachable(
                     component,
                     targetBoard,
                     reachableCells))
@@ -429,6 +575,12 @@ public sealed class RunGenerator : MonoBehaviour
             failureReason =
                 $"{component.name} input port has no empty-cell route " +
                 "to a generator output";
+            return false;
+        }
+
+        if (!foundConsumer)
+        {
+            failureReason = "A run requires at least one Lamp or Fan.";
             return false;
         }
 
@@ -515,6 +667,8 @@ public sealed class RunGenerator : MonoBehaviour
     {
         HashSet<Vector2Int> reachableCells =
             BuildGeneratorReachableCells(targetBoard);
+        RunComponentCounts counts = CountGeneratedComponents();
+        int remainingConsumers = counts.lamps + counts.fans;
 
         for (int componentIndex = generatedComponents.Count - 1;
              componentIndex >= 0;
@@ -530,8 +684,12 @@ public sealed class RunGenerator : MonoBehaviour
                 continue;
             }
 
+            if (remainingConsumers <= MinimumConsumerCount)
+                break;
+
             generatedComponents.RemoveAt(componentIndex);
             DestroyComponentObject(component);
+            remainingConsumers--;
         }
     }
 
@@ -605,8 +763,18 @@ public sealed class RunGenerator : MonoBehaviour
         int maximumComponentCount)
     {
         componentKinds.Clear();
-        AddKinds(ComponentKind.Generator, counts.generators, maximumComponentCount);
-        AddKinds(ComponentKind.Battery, counts.batteries, maximumComponentCount);
+        counts = counts.Clamped();
+        maximumComponentCount = Mathf.Max(0, maximumComponentCount);
+        int consumerCount = counts.lamps + counts.fans;
+        int reservedConsumerCapacity =
+            consumerCount >= MinimumConsumerCount && maximumComponentCount > 0
+                ? MinimumConsumerCount
+                : 0;
+        int nonConsumerCapacity =
+            maximumComponentCount - reservedConsumerCapacity;
+
+        AddKinds(ComponentKind.Generator, counts.generators, nonConsumerCapacity);
+        AddKinds(ComponentKind.Battery, counts.batteries, nonConsumerCapacity);
         AddKinds(ComponentKind.Lamp, counts.lamps, maximumComponentCount);
         AddKinds(ComponentKind.Fan, counts.fans, maximumComponentCount);
     }
@@ -627,6 +795,17 @@ public sealed class RunGenerator : MonoBehaviour
     private bool CompleteGeneration(RunComponentCounts requestedCounts)
     {
         lastGeneratedCounts = CountGeneratedComponents();
+        if (lastGeneratedCounts.lamps + lastGeneratedCounts.fans <
+            MinimumConsumerCount)
+        {
+            DestroyGeneratedComponents();
+            reservedPortCells.Clear();
+            lastGeneratedCounts = default;
+            return Fail(
+                "Run generation could not place the required Lamp or Fan.",
+                true);
+        }
+
         int skippedCount = Mathf.Max(
             0,
             requestedCounts.Total - lastGeneratedCounts.Total);
@@ -673,6 +852,44 @@ public sealed class RunGenerator : MonoBehaviour
         return new RunComponentCounts(generators, batteries, lamps, fans);
     }
 
+    private int CountActiveConsumers(GridBoard targetBoard)
+    {
+        Transform componentsRoot = targetBoard != null
+            ? targetBoard.ComponentsRoot
+            : null;
+        if (componentsRoot != null)
+        {
+            int activeCount = 0;
+            ScoredPowerConsumerComponent[] consumers =
+                componentsRoot.GetComponentsInChildren<
+                    ScoredPowerConsumerComponent>(true);
+            foreach (ScoredPowerConsumerComponent consumer in consumers)
+            {
+                if (consumer != null &&
+                    consumer.IsPlaced &&
+                    consumer.isActiveAndEnabled)
+                {
+                    activeCount++;
+                }
+            }
+
+            return activeCount;
+        }
+
+        int fallbackCount = 0;
+        foreach (BoardComponent generatedComponent in generatedComponents)
+        {
+            if (generatedComponent is ScoredPowerConsumerComponent consumer &&
+                consumer.IsPlaced &&
+                consumer.isActiveAndEnabled)
+            {
+                fallbackCount++;
+            }
+        }
+
+        return fallbackCount;
+    }
+
     private RunComponentCounts RollComponentCounts(
         int targetDifficulty,
         System.Random random)
@@ -684,10 +901,13 @@ public sealed class RunGenerator : MonoBehaviour
                 DifficultyProfile.MaximumDifficulty),
             random);
 
+        int consumerCount = Mathf.Max(
+            MinimumConsumerCount,
+            amounts.Consumers);
         int lamps = 0;
         int fans = 0;
         for (int consumerIndex = 0;
-             consumerIndex < amounts.Consumers;
+             consumerIndex < consumerCount;
              consumerIndex++)
         {
             if (random.Next(2) == 0)
@@ -796,6 +1016,14 @@ public sealed class RunGenerator : MonoBehaviour
         }
 
         generatedComponents.Clear();
+
+        foreach (BoardComponent component in inactiveGeneratedComponents)
+        {
+            if (component != null)
+                DestroyComponentObject(component);
+        }
+
+        inactiveGeneratedComponents.Clear();
     }
 
     private static void DestroyComponentObject(BoardComponent component)

@@ -697,6 +697,26 @@ public sealed class GridBoard : MonoBehaviour
     }
 
     /// <summary>
+    /// Checks component bounds and occupancy while allowing wires in the target
+    /// footprint. Use this before TryPlaceComponentClearingWires when a placement
+    /// is allowed to replace existing wiring.
+    /// </summary>
+    public bool CanPlaceComponentAfterClearingWires(
+        BoardComponent component,
+        Vector2Int gridPosition,
+        int rotationSteps,
+        out string failureReason)
+    {
+        EnsureOccupancy();
+        EnsureWireStorage();
+        return CanPlaceComponentInternal(
+            component,
+            gridPosition,
+            out failureReason,
+            allowWiresInFootprint: true);
+    }
+
+    /// <summary>
     /// Places or moves a component. Failed moves leave its previous placement unchanged.
     /// </summary>
     public bool TryPlaceComponent(
@@ -751,6 +771,54 @@ public sealed class GridBoard : MonoBehaviour
         NotifyTopologyChanged();
 
         return true;
+    }
+
+    /// <summary>
+    /// Places a component after deleting wires in its 2x2 footprint. Bounds,
+    /// scene ownership, and component overlap are validated before any wire is
+    /// changed, so a rejected placement leaves the board untouched.
+    /// </summary>
+    public bool TryPlaceComponentClearingWires(
+        BoardComponent component,
+        Vector2Int gridPosition,
+        int rotationSteps,
+        out string failureReason)
+    {
+        if (component == null)
+        {
+            failureReason = "A BoardComponent reference is required.";
+            return false;
+        }
+
+        if (component.gameObject.scene != gameObject.scene)
+        {
+            failureReason =
+                "A BoardComponent and GridBoard must belong to the same scene or prefab stage.";
+            return false;
+        }
+
+        EnsureOccupancy();
+        EnsureWireStorage();
+        if (!CanPlaceComponentInternal(
+                component,
+                gridPosition,
+                out failureReason,
+                allowWiresInFootprint: true))
+        {
+            return false;
+        }
+
+        for (int y = 0; y < BoardComponent.FootprintHeight; y++)
+        {
+            for (int x = 0; x < BoardComponent.FootprintWidth; x++)
+                ClearWire(gridPosition + new Vector2Int(x, y));
+        }
+
+        return TryPlaceComponent(
+            component,
+            gridPosition,
+            rotationSteps,
+            out failureReason);
     }
 
     /// <summary>
@@ -1204,7 +1272,8 @@ public sealed class GridBoard : MonoBehaviour
     private bool CanPlaceComponentInternal(
         BoardComponent component,
         Vector2Int gridPosition,
-        out string failureReason)
+        out string failureReason,
+        bool allowWiresInFootprint = false)
     {
         if (component == null)
         {
@@ -1232,7 +1301,7 @@ public sealed class GridBoard : MonoBehaviour
                     return false;
                 }
 
-                if (HasWireInternal(cell))
+                if (!allowWiresInFootprint && HasWireInternal(cell))
                 {
                     failureReason = $"Cell {cell} already contains a wire.";
                     return false;

@@ -5,12 +5,12 @@ using UnityEngine.Serialization;
 
 public enum ChaosEventType
 {
-    WireFault,
     BatteryFluctuation,
     GeneratorOutputShift,
     ConsumerRequiredPowerShift,
     ConsumerIdealPowerShift = ConsumerRequiredPowerShift,
-    ConsumerRemoval
+    ConsumerRemoval,
+    ConsumerRespawn
 }
 
 public readonly struct ChaosEvent
@@ -71,9 +71,6 @@ public sealed class ChaosController : MonoBehaviour
 
     [Header("Strength")]
     [SerializeField, Min(1)]
-    private int maximumWireFaultCells = 4;
-
-    [SerializeField, Min(1)]
     private int maximumBatteryTargets = 3;
 
     [SerializeField, Range(0f, 1f)]
@@ -103,7 +100,14 @@ public sealed class ChaosController : MonoBehaviour
     [Tooltip("Maximum generated Lamps/Fans removed by one full-strength event.")]
     private int maximumConsumerRemovals = 2;
 
-    private readonly List<Vector2Int> wireCandidates = new();
+    [SerializeField, Min(1)]
+    [Tooltip("Maximum inactive Lamps/Fans respawned by one full-strength event.")]
+    private int maximumConsumerRespawns = 2;
+
+    [SerializeField, Min(1)]
+    [Tooltip("Maximum respawn event-selection weight. Higher ChaosValue approaches this weight and also shortens the global chaos interval.")]
+    private int maximumConsumerRespawnEventWeight = 4;
+
     private readonly List<BatteryComponent> batteryCandidates = new();
     private readonly List<GeneratorComponent> generatorCandidates = new();
     private readonly List<ScoredPowerConsumerComponent> consumerCandidates = new();
@@ -148,7 +152,6 @@ public sealed class ChaosController : MonoBehaviour
             0.1f,
             lowChaosInterval);
         intervalJitter = Mathf.Clamp(intervalJitter, 0f, 0.9f);
-        maximumWireFaultCells = Mathf.Max(1, maximumWireFaultCells);
         maximumBatteryTargets = Mathf.Max(1, maximumBatteryTargets);
         minimumBatterySwing = Mathf.Clamp01(minimumBatterySwing);
         maximumBatterySwing = Mathf.Clamp(
@@ -164,6 +167,10 @@ public sealed class ChaosController : MonoBehaviour
             MinimumConsumerMaximumRequiredPower,
             maximumConsumerRequiredPowerAtFullChaos);
         maximumConsumerRemovals = Mathf.Max(1, maximumConsumerRemovals);
+        maximumConsumerRespawns = Mathf.Max(1, maximumConsumerRespawns);
+        maximumConsumerRespawnEventWeight = Mathf.Max(
+            1,
+            maximumConsumerRespawnEventWeight);
     }
 
     private void Update()
@@ -217,7 +224,6 @@ public sealed class ChaosController : MonoBehaviour
         runActive = false;
         timeUntilNextEvent = float.PositiveInfinity;
         random = null;
-        wireCandidates.Clear();
         batteryCandidates.Clear();
         generatorCandidates.Clear();
         consumerCandidates.Clear();
@@ -267,11 +273,11 @@ public sealed class ChaosController : MonoBehaviour
             random.Next(availableEventTypes.Count)];
         ChaosEvent chaosEvent = selectedType switch
         {
-            ChaosEventType.WireFault => ApplyWireFault(),
             ChaosEventType.BatteryFluctuation => ApplyBatteryFluctuation(),
             ChaosEventType.GeneratorOutputShift => ApplyGeneratorOutputShift(),
             ChaosEventType.ConsumerRequiredPowerShift => ApplyConsumerRequiredPowerShift(),
             ChaosEventType.ConsumerRemoval => ApplyConsumerRemoval(),
+            ChaosEventType.ConsumerRespawn => ApplyConsumerRespawn(),
             _ => default
         };
 
@@ -288,9 +294,6 @@ public sealed class ChaosController : MonoBehaviour
     {
         availableEventTypes.Clear();
 
-        if (wireCandidates.Count > 0)
-            availableEventTypes.Add(ChaosEventType.WireFault);
-
         if (batteryCandidates.Count > 0)
             availableEventTypes.Add(ChaosEventType.BatteryFluctuation);
 
@@ -300,32 +303,22 @@ public sealed class ChaosController : MonoBehaviour
         if (consumerCandidates.Count > 0)
             availableEventTypes.Add(ChaosEventType.ConsumerRequiredPowerShift);
 
-        if (removableConsumerCandidates.Count > 0)
+        if (consumerCandidates.Count > 1 &&
+            removableConsumerCandidates.Count > 0)
             availableEventTypes.Add(ChaosEventType.ConsumerRemoval);
-    }
 
-    private ChaosEvent ApplyWireFault()
-    {
-        float strength = NormalizedChaos;
-        int targetCount = GetScaledTargetCount(maximumWireFaultCells, strength);
-        int affectedCount = 0;
-
-        for (int index = 0;
-             index < targetCount && index < wireCandidates.Count;
-             index++)
+        RunGenerator targetRunGenerator = ResolveRunGenerator();
+        if (targetRunGenerator == null ||
+            !targetRunGenerator.HasInactiveGeneratedComponents)
         {
-            int selectionIndex = random.Next(index, wireCandidates.Count);
-            (wireCandidates[index], wireCandidates[selectionIndex]) =
-                (wireCandidates[selectionIndex], wireCandidates[index]);
-
-            if (board.ClearWire(wireCandidates[index]))
-                affectedCount++;
+            return;
         }
 
-        return new ChaosEvent(
-            ChaosEventType.WireFault,
-            strength,
-            affectedCount);
+        int respawnWeight = GetScaledTargetCount(
+            maximumConsumerRespawnEventWeight,
+            NormalizedChaos);
+        for (int index = 0; index < respawnWeight; index++)
+            availableEventTypes.Add(ChaosEventType.ConsumerRespawn);
     }
 
     private ChaosEvent ApplyBatteryFluctuation()
@@ -486,6 +479,9 @@ public sealed class ChaosController : MonoBehaviour
         int targetCount = GetScaledTargetCount(
             maximumConsumerRemovals,
             strength);
+        targetCount = Mathf.Min(
+            targetCount,
+            Mathf.Max(0, consumerCandidates.Count - 1));
         int affectedCount = 0;
         RunGenerator targetRunGenerator = ResolveRunGenerator();
         if (targetRunGenerator == null)
@@ -518,8 +514,8 @@ public sealed class ChaosController : MonoBehaviour
         if (affectedCount > 0)
             ResolveCircuitSystem()?.RebuildIfDirty();
 
-        // Removed Unity objects are destroyed at end of frame. Do not retain
-        // them in chaos scratch buffers during that deferred-destruction window.
+        // Removed consumers are inactive now, so discard the active-candidate
+        // snapshots before the next event can consider them again.
         consumerCandidates.Clear();
         removableConsumerCandidates.Clear();
 
@@ -529,9 +525,36 @@ public sealed class ChaosController : MonoBehaviour
             affectedCount);
     }
 
+    private ChaosEvent ApplyConsumerRespawn()
+    {
+        float strength = NormalizedChaos;
+        int targetCount = GetScaledTargetCount(
+            maximumConsumerRespawns,
+            strength);
+        int affectedCount = 0;
+        RunGenerator targetRunGenerator = ResolveRunGenerator();
+
+        for (int index = 0;
+             targetRunGenerator != null && index < targetCount;
+             index++)
+        {
+            if (!targetRunGenerator.TryRespawnGeneratedComponent(random))
+                break;
+
+            affectedCount++;
+        }
+
+        if (affectedCount > 0)
+            ResolveCircuitSystem()?.RebuildIfDirty();
+
+        return new ChaosEvent(
+            ChaosEventType.ConsumerRespawn,
+            strength,
+            affectedCount);
+    }
+
     private void CollectCandidates()
     {
-        wireCandidates.Clear();
         batteryCandidates.Clear();
         generatorCandidates.Clear();
         consumerCandidates.Clear();
@@ -540,9 +563,6 @@ public sealed class ChaosController : MonoBehaviour
         GridBoard targetBoard = ResolveBoard();
         if (targetBoard == null)
             return;
-
-        foreach (Vector2Int cell in targetBoard.WireCells)
-            wireCandidates.Add(cell);
 
         Transform componentsRoot = targetBoard.ComponentsRoot;
         if (componentsRoot == null)
