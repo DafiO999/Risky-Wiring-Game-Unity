@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [Serializable]
-public sealed class SlotResultEvent : UnityEvent<int, int, float>
+public sealed class SlotResultEvent : UnityEvent<Vector2Int, int, float>
 {
 }
 
@@ -50,7 +50,13 @@ public sealed class SlotMachineController : MonoBehaviour
 
     [Header("Values")]
     [SerializeField]
-    private int[] gridSizes = { 6, 7, 8, 9 };
+    private Vector2Int[] gridSizes =
+    {
+        new(7, 5),
+        new(8, 6),
+        new(9, 7),
+        new(10, 8)
+    };
 
     [SerializeField]
     private int[] difficulties = { 1, 2, 3, 4 };
@@ -84,13 +90,13 @@ public sealed class SlotMachineController : MonoBehaviour
 
     private bool isSpinning;
     private bool hasResult;
-    private int selectedGridSize;
+    private Vector2Int selectedGridSize;
     private int selectedDifficulty;
     private float selectedTime;
 
     public bool IsSpinning => isSpinning;
     public bool HasResult => hasResult;
-    public int GridSize { get; private set; }
+    public Vector2Int GridSize { get; private set; }
     public int Difficulty { get; private set; }
     public float Time { get; private set; }
     public SlotResultEvent OnSpinCompleted => onSpinCompleted;
@@ -99,7 +105,7 @@ public sealed class SlotMachineController : MonoBehaviour
     /// C# result callback with the independently selected grid size, difficulty,
     /// and run time.
     /// </summary>
-    public event Action<int, int, float> SpinCompleted;
+    public event Action<Vector2Int, int, float> SpinCompleted;
 
     private void Awake()
     {
@@ -231,7 +237,7 @@ public sealed class SlotMachineController : MonoBehaviour
     /// Returns the latest completed result. False means the first spin is still
     /// pending or a new spin is currently running.
     /// </summary>
-    public bool TryGetResult(out int gridSize, out int difficulty, out float time)
+    public bool TryGetResult(out Vector2Int gridSize, out int difficulty, out float time)
     {
         gridSize = GridSize;
         difficulty = Difficulty;
@@ -267,7 +273,7 @@ public sealed class SlotMachineController : MonoBehaviour
     private void UpdateResultTexts()
     {
         if (gridSizeResultText != null)
-            gridSizeResultText.text = GridSize.ToString();
+            gridSizeResultText.text = $"{GridSize.x}x{GridSize.y}";
 
         if (difficultyResultText != null)
             difficultyResultText.text = Difficulty.ToString();

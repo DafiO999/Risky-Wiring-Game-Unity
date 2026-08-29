@@ -28,27 +28,12 @@ Transform:
   m_GameObject: {fileID: 456062389825942955}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.5695364, y: 0.65855, z: 0.2847682}
+  m_LocalPosition: {x: 0.569, y: 0.29, z: 0.285}
   m_LocalScale: {x: 0.105, y: 0.3171, z: 0.105}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4211089868759360936}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &9000000000000000102
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 456062389825942955}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2c9f5e8d1a7460a91b4c47d0b66f8a2, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::BoardPortView
-  component: {fileID: 6642508859170002617}
-  portIndex: 1
-  heightAboveBoard: 0.3828779
 --- !u!33 &4986601581744640599
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -106,6 +91,21 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &9000000000000000102
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 456062389825942955}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c9f5e8d1a7460a91b4c47d0b66f8a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BoardPortView
+  component: {fileID: 6642508859170002617}
+  portIndex: 1
+  heightAboveBoard: 0.3828779
 --- !u!1 &1675246814767975488
 GameObject:
   m_ObjectHideFlags: 0
@@ -134,27 +134,12 @@ Transform:
   m_GameObject: {fileID: 1675246814767975488}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.2847682, y: 0.65855, z: -0.5695364}
+  m_LocalPosition: {x: 0.285, y: 0.29, z: -0.569}
   m_LocalScale: {x: 0.105, y: 0.3171, z: 0.105}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4211089868759360936}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &9000000000000000103
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1675246814767975488}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2c9f5e8d1a7460a91b4c47d0b66f8a2, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::BoardPortView
-  component: {fileID: 6642508859170002617}
-  portIndex: 2
-  heightAboveBoard: 0.3828779
 --- !u!33 &3804895388399506791
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -212,6 +197,21 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &9000000000000000103
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675246814767975488}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c9f5e8d1a7460a91b4c47d0b66f8a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BoardPortView
+  component: {fileID: 6642508859170002617}
+  portIndex: 2
+  heightAboveBoard: 0.3828779
 --- !u!1 &5001278685711010118
 GameObject:
   m_ObjectHideFlags: 0
@@ -240,27 +240,12 @@ Transform:
   m_GameObject: {fileID: 5001278685711010118}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.2847682, y: 0.65855, z: 0.5695364}
+  m_LocalPosition: {x: -0.285, y: 0.29, z: 0.57}
   m_LocalScale: {x: 0.105, y: 0.3171, z: 0.105}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4211089868759360936}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &9000000000000000101
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5001278685711010118}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2c9f5e8d1a7460a91b4c47d0b66f8a2, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::BoardPortView
-  component: {fileID: 6642508859170002617}
-  portIndex: 0
-  heightAboveBoard: 0.3828779
 --- !u!33 &431649499095428270
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -318,6 +303,21 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &9000000000000000101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5001278685711010118}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c9f5e8d1a7460a91b4c47d0b66f8a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BoardPortView
+  component: {fileID: 6642508859170002617}
+  portIndex: 0
+  heightAboveBoard: 0.3828779
 --- !u!1 &6951193463031730404
 GameObject:
   m_ObjectHideFlags: 0
@@ -346,27 +346,12 @@ Transform:
   m_GameObject: {fileID: 6951193463031730404}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.5695364, y: 0.65855, z: -0.2847682}
+  m_LocalPosition: {x: -0.57, y: 0.29, z: -0.284}
   m_LocalScale: {x: 0.105, y: 0.3171, z: 0.105}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4211089868759360936}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &9000000000000000104
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6951193463031730404}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2c9f5e8d1a7460a91b4c47d0b66f8a2, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::BoardPortView
-  component: {fileID: 6642508859170002617}
-  portIndex: 3
-  heightAboveBoard: 0.3828779
 --- !u!33 &6714621669785705124
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -424,6 +409,21 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &9000000000000000104
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6951193463031730404}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c9f5e8d1a7460a91b4c47d0b66f8a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BoardPortView
+  component: {fileID: 6642508859170002617}
+  portIndex: 3
+  heightAboveBoard: 0.3828779
 --- !u!1 &8823847030754594297
 GameObject:
   m_ObjectHideFlags: 0

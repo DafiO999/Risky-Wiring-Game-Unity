@@ -7,9 +7,9 @@ public sealed class RunSettings
     public const int MinimumGridSize = 1;
     public const float MinimumDuration = 0.1f;
 
-    [SerializeField, Min(MinimumGridSize)]
-    [Tooltip("Number of cells along both sides of the square grid.")]
-    private int gridSize = 8;
+    [SerializeField]
+    [Tooltip("Grid dimensions in cells: width (X) and height (Y).")]
+    private Vector2Int gridSize = new(8, 8);
 
     [SerializeField, Range(
         DifficultyProfile.MinimumDifficulty,
@@ -23,10 +23,12 @@ public sealed class RunSettings
     [SerializeField]
     private int seed = 12345;
 
-    public int GridSize
+    public Vector2Int GridSize
     {
         get => gridSize;
-        set => gridSize = Mathf.Max(MinimumGridSize, value);
+        set => gridSize = new Vector2Int(
+            Mathf.Max(MinimumGridSize, value.x),
+            Mathf.Max(MinimumGridSize, value.y));
     }
 
     public int Difficulty
@@ -62,6 +64,15 @@ public sealed class RunSettings
     }
 
     public RunSettings(int gridSize, int difficulty, float duration, int seed)
+        : this(new Vector2Int(gridSize, gridSize), difficulty, duration, seed)
+    {
+    }
+
+    public RunSettings(
+        Vector2Int gridSize,
+        int difficulty,
+        float duration,
+        int seed)
     {
         GridSize = gridSize;
         Difficulty = difficulty;

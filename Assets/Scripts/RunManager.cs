@@ -94,7 +94,7 @@ public sealed class RunManager : MonoBehaviour
     /// <summary>
     /// Applies the three slot results and starts a run with a newly generated seed.
     /// </summary>
-    public bool StartRun(int gridSize, int difficulty, float duration)
+    public bool StartRun(Vector2Int gridSize, int difficulty, float duration)
     {
         return StartRunInternal(
             gridSize,
@@ -104,7 +104,7 @@ public sealed class RunManager : MonoBehaviour
     }
 
     private bool StartRunInternal(
-        int gridSize,
+        Vector2Int gridSize,
         int difficulty,
         float duration,
         int seed)
@@ -135,7 +135,9 @@ public sealed class RunManager : MonoBehaviour
 
         targetScoreSystem.ResetScore();
         targetGenerator.ClearBoard();
-        targetBoard.SetSize(currentSettings.GridSize);
+        targetBoard.SetSize(
+            currentSettings.GridSize.x,
+            currentSettings.GridSize.y);
 
         if (!targetGenerator.Generate(
                 currentSettings.Difficulty,
@@ -177,7 +179,10 @@ public sealed class RunManager : MonoBehaviour
         ResolveScoreSystem()?.SetAccumulationEnabled(false);
     }
 
-    private void HandleSpinCompleted(int gridSize, int difficulty, float duration)
+    private void HandleSpinCompleted(
+        Vector2Int gridSize,
+        int difficulty,
+        float duration)
     {
         StartRun(gridSize, difficulty, duration);
     }
