@@ -170,7 +170,30 @@ public sealed class RunGenerator : MonoBehaviour
         ClearBoard();
         BuildComponentKindList(
             requestedCounts,
-            targetBoard.CellCount / 4);
+            (targetBoard.Width / BoardComponent.FootprintWidth) *
+            (targetBoard.Height / BoardComponent.FootprintHeight));
+
+        Transform stagingRoot = CreateStagingRoot();
+        try
+        {
+            return GenerateLayout(
+                targetBoard,
+                requestedCounts,
+                random,
+                stagingRoot);
+        }
+        finally
+        {
+            DestroySafely(stagingRoot.gameObject);
+        }
+    }
+
+    private bool GenerateLayout(
+        GridBoard targetBoard,
+        RunComponentCounts requestedCounts,
+        System.Random random,
+        Transform stagingRoot)
+    {
 
         for (int boardAttempt = 0;
              boardAttempt < boardRegenerationAttempts;
@@ -187,7 +210,7 @@ public sealed class RunGenerator : MonoBehaviour
                 BoardComponent component = CreateComponent(
                     kind,
                     componentIndex,
-                    targetBoard.EnsureComponentsRoot());
+                    stagingRoot);
                 if (component == null)
                 {
                     DestroyGeneratedComponents();
@@ -249,6 +272,7 @@ public sealed class RunGenerator : MonoBehaviour
         generatedComponents.Clear();
         reservedPortCells.Clear();
         lastFailureReason = string.Empty;
+        lastGeneratedCounts = default;
 
         if (targetBoard == null)
             return;
@@ -710,6 +734,16 @@ public sealed class RunGenerator : MonoBehaviour
         return component;
     }
 
+    private Transform CreateStagingRoot()
+    {
+        GameObject stagingObject = new("Run Generation Staging");
+        stagingObject.hideFlags = HideFlags.HideInHierarchy |
+                                  HideFlags.DontSave;
+        stagingObject.transform.SetParent(transform, false);
+        stagingObject.SetActive(false);
+        return stagingObject.transform;
+    }
+
     private GameObject GetPrefab(ComponentKind kind)
     {
         return kind switch
@@ -753,6 +787,13 @@ public sealed class RunGenerator : MonoBehaviour
         component.ClearPlacement();
         GameObject componentObject = component.gameObject;
         componentObject.SetActive(false);
+
+        if (Application.isPlaying)
+        {
+            componentObject.transform.SetParent(null, false);
+            componentObject.hideFlags |= HideFlags.HideInHierarchy;
+        }
+
         DestroySafely(componentObject);
     }
 

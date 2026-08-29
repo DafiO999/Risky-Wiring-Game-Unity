@@ -97,7 +97,10 @@ public class BoardComponent : MonoBehaviour
         ValidatePortConfiguration();
 
         if (board != null && isPlaced)
+        {
+            RefreshPortViews();
             board.RefreshWireConnections();
+        }
     }
 
     protected virtual void OnTransformParentChanged()
@@ -274,7 +277,19 @@ public class BoardComponent : MonoBehaviour
         transform.SetPositionAndRotation(worldPosition, worldRotation);
 
         isPlaced = true;
+        RefreshPortViews();
         isApplyingPlacement = false;
+    }
+
+    public void RefreshPortViews()
+    {
+        BoardPortView[] portViews =
+            GetComponentsInChildren<BoardPortView>(true);
+        foreach (BoardPortView portView in portViews)
+        {
+            if (portView != null)
+                portView.RefreshPose(this);
+        }
     }
 
     internal void SetPlacementValidity(bool value)

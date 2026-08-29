@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 
 [DisallowMultipleComponent]
 [ExecuteAlways]
@@ -33,6 +34,7 @@ public sealed class GridBoard : MonoBehaviour
 
     [Header("Scene Debug")]
     [SerializeField]
+    [Tooltip("Draw the grid as Scene-view gizmos.")]
     private bool drawGrid = true;
 
     [SerializeField]
@@ -40,6 +42,15 @@ public sealed class GridBoard : MonoBehaviour
 
     [SerializeField]
     private Color hoverColor = new(1f, 0.55f, 0f, 0.3f);
+
+    [Header("Game View Grid")]
+    [SerializeField]
+    [Tooltip("Draw the logical grid in the Game view and player builds.")]
+    private bool drawGridInGameView = true;
+
+    [SerializeField, Range(0f, 0.1f)]
+    [Tooltip("Raises runtime grid lines above the board to avoid depth flicker, as a fraction of cell size.")]
+    private float gameViewGridHeight = 0.01f;
 
     [Header("Component Hierarchy")]
     [SerializeField]
@@ -97,6 +108,10 @@ public sealed class GridBoard : MonoBehaviour
     private bool hasPreviousWireDragCell;
     private Vector2Int previousWireDragCell;
     private readonly Dictionary<Vector2Int, WireView> wireViews = new();
+    private GameObject runtimeGridObject;
+    private Mesh runtimeGridMesh;
+    private MeshRenderer runtimeGridRenderer;
+    private Material runtimeGridMaterial;
 
     public int Width => width;
     public int Height => height;
@@ -107,6 +122,18 @@ public sealed class GridBoard : MonoBehaviour
     public Transform DisplayRoot => ResolveDisplayRoot();
     public Transform ComponentsRoot => ResolveComponentsRoot();
     public int TopologyRevision => topologyRevision;
+    public bool DrawGridInGameView
+    {
+        get => drawGridInGameView;
+        set
+        {
+            if (drawGridInGameView == value)
+                return;
+
+            drawGridInGameView = value;
+            RefreshRuntimeGridView();
+        }
+    }
 
     public event Action<Vector2Int> WireChanged;
     public event Action TopologyChanged;
@@ -136,6 +163,7 @@ public sealed class GridBoard : MonoBehaviour
         EnsureComponentsRoot();
         RebuildOccupancy();
         RefreshWireViews();
+        RefreshRuntimeGridView();
     }
 
     private void OnEnable()
@@ -145,11 +173,18 @@ public sealed class GridBoard : MonoBehaviour
         EnsureComponentsRoot();
         RebuildOccupancy();
         RefreshWireViews();
+        RefreshRuntimeGridView();
     }
 
     private void OnDisable()
     {
         ResetWireDrag();
+        DestroyRuntimeGridView();
+    }
+
+    private void OnDestroy()
+    {
+        DestroyRuntimeGridView();
     }
 
     private void OnValidate()
@@ -160,10 +195,13 @@ public sealed class GridBoard : MonoBehaviour
         wireViewHeight = Mathf.Clamp(wireViewHeight, 0f, 0.25f);
         wireGizmoHeight = Mathf.Clamp(wireGizmoHeight, 0f, 0.25f);
         wireGizmoNodeSize = Mathf.Clamp(wireGizmoNodeSize, 0.01f, 0.2f);
+        gameViewGridHeight = Mathf.Clamp(gameViewGridHeight, 0f, 0.1f);
         RebuildCells();
         bool topologyResized = EnsureWireStorage();
         occupancyDirty = true;
         wireViewsDirty = true;
+        if (runtimeGridObject != null)
+            RefreshRuntimeGridView();
         if (topologyResized)
             NotifyTopologyChanged();
     }
@@ -172,6 +210,17 @@ public sealed class GridBoard : MonoBehaviour
     {
         if (wireViewsDirty)
             RefreshWireViews();
+
+        if (Application.isPlaying &&
+            drawGridInGameView &&
+            runtimeGridObject == null)
+        {
+            RefreshRuntimeGridView();
+        }
+        else
+        {
+            UpdateRuntimeGridVisibility();
+        }
 
         if (!Application.isPlaying || !enableWirePlacement)
         {
@@ -252,6 +301,7 @@ public sealed class GridBoard : MonoBehaviour
         EnsureWireStorage();
         EnsureOccupancy();
         RefreshWireViews();
+        RefreshRuntimeGridView();
         NotifyTopologyChanged();
     }
 
@@ -1319,6 +1369,176 @@ public sealed class GridBoard : MonoBehaviour
     {
         activeWireEditMode = WireEditMode.None;
         hasPreviousWireDragCell = false;
+    }
+
+    private void RefreshRuntimeGridView()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        if (!drawGridInGameView)
+        {
+            UpdateRuntimeGridVisibility();
+            return;
+        }
+
+        EnsureRuntimeGridView();
+        if (runtimeGridMesh == null || runtimeGridObject == null)
+            return;
+
+        int lineCount = width + height + 2;
+        Vector3[] vertices = new Vector3[lineCount * 2];
+        int[] indices = new int[vertices.Length];
+        Vector3 bottomLeft = GetLocalBottomLeft();
+        float boardWidth = width * cellSize;
+        float boardHeight = height * cellSize;
+        int vertexIndex = 0;
+
+        for (int x = 0; x <= width; x++)
+        {
+            float localX = bottomLeft.x + x * cellSize;
+            vertices[vertexIndex] = new Vector3(localX, 0f, bottomLeft.z);
+            indices[vertexIndex] = vertexIndex;
+            vertexIndex++;
+            vertices[vertexIndex] = new Vector3(
+                localX,
+                0f,
+                bottomLeft.z + boardHeight);
+            indices[vertexIndex] = vertexIndex;
+            vertexIndex++;
+        }
+
+        for (int y = 0; y <= height; y++)
+        {
+            float localZ = bottomLeft.z + y * cellSize;
+            vertices[vertexIndex] = new Vector3(bottomLeft.x, 0f, localZ);
+            indices[vertexIndex] = vertexIndex;
+            vertexIndex++;
+            vertices[vertexIndex] = new Vector3(
+                bottomLeft.x + boardWidth,
+                0f,
+                localZ);
+            indices[vertexIndex] = vertexIndex;
+            vertexIndex++;
+        }
+
+        runtimeGridMesh.Clear();
+        runtimeGridMesh.vertices = vertices;
+        runtimeGridMesh.SetIndices(indices, MeshTopology.Lines, 0);
+        runtimeGridMesh.RecalculateBounds();
+        runtimeGridObject.transform.localPosition =
+            Vector3.up * (gameViewGridHeight * cellSize);
+        UpdateRuntimeGridMaterial();
+        UpdateRuntimeGridVisibility();
+    }
+
+    private void EnsureRuntimeGridView()
+    {
+        if (runtimeGridObject != null &&
+            runtimeGridMesh != null &&
+            runtimeGridRenderer != null)
+        {
+            return;
+        }
+
+        Shader gridShader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (gridShader == null)
+            gridShader = Shader.Find("Unlit/Color");
+
+        if (gridShader == null)
+        {
+            Debug.LogWarning(
+                "Runtime grid could not find an unlit shader.",
+                this);
+            return;
+        }
+
+        runtimeGridObject = new GameObject("Runtime Grid");
+        runtimeGridObject.hideFlags = HideFlags.HideInHierarchy |
+                                      HideFlags.DontSave;
+        runtimeGridObject.layer = gameObject.layer;
+        runtimeGridObject.transform.SetParent(transform, false);
+
+        MeshFilter meshFilter = runtimeGridObject.AddComponent<MeshFilter>();
+        runtimeGridRenderer = runtimeGridObject.AddComponent<MeshRenderer>();
+        runtimeGridRenderer.shadowCastingMode = ShadowCastingMode.Off;
+        runtimeGridRenderer.receiveShadows = false;
+        runtimeGridRenderer.motionVectorGenerationMode =
+            MotionVectorGenerationMode.ForceNoMotion;
+
+        runtimeGridMesh = new Mesh
+        {
+            name = "Runtime Grid Mesh",
+            hideFlags = HideFlags.HideAndDontSave
+        };
+        meshFilter.sharedMesh = runtimeGridMesh;
+
+        runtimeGridMaterial = new Material(gridShader)
+        {
+            name = "Runtime Grid Material",
+            hideFlags = HideFlags.HideAndDontSave,
+            renderQueue = (int)RenderQueue.Transparent
+        };
+        runtimeGridMaterial.SetOverrideTag("RenderType", "Transparent");
+        SetMaterialFloat("_Surface", 1f);
+        SetMaterialFloat("_Blend", 0f);
+        SetMaterialFloat("_AlphaClip", 0f);
+        SetMaterialFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+        SetMaterialFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+        SetMaterialFloat("_ZWrite", 0f);
+        runtimeGridMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        runtimeGridMaterial.DisableKeyword("_ALPHATEST_ON");
+        runtimeGridRenderer.sharedMaterial = runtimeGridMaterial;
+    }
+
+    private void UpdateRuntimeGridMaterial()
+    {
+        if (runtimeGridMaterial == null)
+            return;
+
+        if (runtimeGridMaterial.HasProperty("_BaseColor"))
+            runtimeGridMaterial.SetColor("_BaseColor", gridColor);
+
+        if (runtimeGridMaterial.HasProperty("_Color"))
+            runtimeGridMaterial.SetColor("_Color", gridColor);
+    }
+
+    private void UpdateRuntimeGridVisibility()
+    {
+        if (runtimeGridRenderer != null)
+            runtimeGridRenderer.enabled = Application.isPlaying &&
+                                          drawGridInGameView;
+    }
+
+    private void SetMaterialFloat(string propertyName, float value)
+    {
+        if (runtimeGridMaterial != null &&
+            runtimeGridMaterial.HasProperty(propertyName))
+        {
+            runtimeGridMaterial.SetFloat(propertyName, value);
+        }
+    }
+
+    private void DestroyRuntimeGridView()
+    {
+        DestroyRuntimeObject(runtimeGridObject);
+        DestroyRuntimeObject(runtimeGridMesh);
+        DestroyRuntimeObject(runtimeGridMaterial);
+        runtimeGridObject = null;
+        runtimeGridMesh = null;
+        runtimeGridRenderer = null;
+        runtimeGridMaterial = null;
+    }
+
+    private static void DestroyRuntimeObject(UnityEngine.Object target)
+    {
+        if (target == null)
+            return;
+
+        if (Application.isPlaying)
+            Destroy(target);
+        else
+            DestroyImmediate(target);
     }
 
     private Vector3 GetLocalBottomLeft()
