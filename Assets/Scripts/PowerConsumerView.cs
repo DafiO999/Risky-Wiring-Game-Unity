@@ -14,6 +14,16 @@ public sealed class PowerConsumerView : MonoBehaviour
     [Tooltip("Renderers tinted from the consumer state. If empty, child renderers are found automatically.")]
     private Renderer[] targetRenderers;
 
+    [SerializeField]
+    private Light[] targetLights;
+
+    [SerializeField]
+    private Transform rotatingFan;
+
+    [SerializeField]
+    private float fanRotationSpeed = 90f;
+    private float _fanRotationSpeed;
+
     [Header("Power State Colors")]
     [SerializeField]
     private Color offColor = new(0.16f, 0.18f, 0.2f, 1f);
@@ -89,6 +99,23 @@ public sealed class PowerConsumerView : MonoBehaviour
             propertyBlock.SetColor(BaseColorId, color);
             propertyBlock.SetColor(ColorId, color);
             targetRenderer.SetPropertyBlock(propertyBlock);
+        }
+
+        foreach (Light targetLight in targetLights)
+        {
+            if (targetLight == null)
+                continue;
+            targetLight.color = color;
+        }
+
+        _fanRotationSpeed = fanRotationSpeed * ((float)state);
+    }
+
+    private void Update()
+    {
+        if (rotatingFan != null)
+        {
+            rotatingFan.Rotate(Vector3.forward, _fanRotationSpeed * Time.deltaTime);
         }
     }
 

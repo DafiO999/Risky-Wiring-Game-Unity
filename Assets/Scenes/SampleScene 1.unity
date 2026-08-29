@@ -1088,8 +1088,8 @@ Camera:
   near clip plane: 0.3
   far clip plane: 1000
   field of view: 60.000004
-  orthographic: 0
-  orthographic size: 5
+  orthographic: 1
+  orthographic size: 8.7
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -1113,8 +1113,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.13052605, y: 0, z: 0, w: 0.99144495}
-  m_LocalPosition: {x: 0.66, y: 4.86, z: -12.98}
+  m_LocalRotation: {x: 0.00000012665987, y: -0.7071068, z: 0.00000012665987, w: 0.7071068}
+  m_LocalPosition: {x: -4.99, y: 4.86, z: -21.07}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4234,7 +4234,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera
   Priority:
     Enabled: 1
-    m_Value: 0
+    m_Value: 38
   OutputChannel: 1
   StandbyUpdate: 2
   m_StreamingVersion: 20241001
