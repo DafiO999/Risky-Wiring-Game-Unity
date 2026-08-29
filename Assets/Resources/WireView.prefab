@@ -510,8 +510,8 @@ MonoBehaviour:
   - {fileID: 4901446957193639913}
   - {fileID: 3822005814661749948}
   - {fileID: 2759350967955451058}
-  inactiveColor: {r: 0.16, g: 0.18, b: 0.2, a: 1}
-  activeColor: {r: 0.15, g: 1, b: 0.75, a: 1}
+  inactiveColor: {r: 0.5754717, g: 0.000000017150393, b: 0, a: 1}
+  activeColor: {r: 0.9056604, g: 0.07157456, b: 0, a: 1}
   gridCell: {x: 0, y: 0}
   connections: 0
   netId: -1

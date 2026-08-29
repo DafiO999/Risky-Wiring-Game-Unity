@@ -16,6 +16,9 @@ public sealed class SlotChaosResultEvent : UnityEvent<Vector2Int, int, float, in
 [DisallowMultipleComponent]
 public sealed class SlotMachineController : MonoBehaviour
 {
+
+    [SerializeField]
+    private ShopController shopController;
     private const float DegreesPerRound = 360f;
 
     [Header("Trigger")]
@@ -240,10 +243,12 @@ public sealed class SlotMachineController : MonoBehaviour
             return false;
         }
 
-        selectedGridSize = gridSizes[UnityEngine.Random.Range(0, gridSizes.Length)];
-        selectedDifficulty = difficulties[UnityEngine.Random.Range(0, difficulties.Length)];
-        selectedTime = times[UnityEngine.Random.Range(0, times.Length)];
-        selectedChaosValue = chaosValues[UnityEngine.Random.Range(0, chaosValues.Length)];
+
+
+        selectedGridSize = gridSizes[UnityEngine.Random.Range(0, shopController.GetValue(UpgradeId.GridSize))];
+        selectedDifficulty = difficulties[UnityEngine.Random.Range(0, shopController.GetValue(UpgradeId.Difficulty))];
+        selectedTime = times[UnityEngine.Random.Range(0, shopController.GetValue(UpgradeId.Time))];
+        selectedChaosValue = chaosValues[UnityEngine.Random.Range(0, shopController.GetValue(UpgradeId.Chaos))];
 
         hasResult = false;
         isSpinning = true;

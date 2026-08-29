@@ -12,12 +12,17 @@ public interface IScoreRateSource
 [DefaultExecutionOrder(200)]
 public class ScoreSystem : MonoBehaviour
 {
+    
+
     [FormerlySerializedAs("score")]
     [SerializeField, Min(0f)]
     private float currentScore;
 
     [SerializeField, HideInInspector]
     private int currentScorePerSecond;
+
+    [SerializeField]
+    private SaveManager saveManager;
 
     private bool accumulationEnabled = true;
 
@@ -98,6 +103,10 @@ public class ScoreSystem : MonoBehaviour
     {
         SetScore(currentScore + amount);
     }
+    public void RemoveScore(float amount)
+    {
+        SetScore(currentScore - amount);
+    }
 
     public void SetScore(float value)
     {
@@ -106,6 +115,7 @@ public class ScoreSystem : MonoBehaviour
             return;
 
         currentScore = clampedValue;
+        saveManager.SaveScore(currentScore);
         ScoreChanged?.Invoke(currentScore);
     }
 
