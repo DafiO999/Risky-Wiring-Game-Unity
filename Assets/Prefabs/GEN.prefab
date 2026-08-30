@@ -752,6 +752,8 @@ GameObject:
   - component: {fileID: 8365097872924995518}
   - component: {fileID: 9004716706175372859}
   - component: {fileID: 6642508859170002617}
+  - component: {fileID: 4383126394870898508}
+  - component: {fileID: 4414884177395001504}
   m_Layer: 0
   m_Name: GEN
   m_TagString: Untagged
@@ -895,6 +897,47 @@ MonoBehaviour:
   inputPortColor: {r: 0.04, g: 0.45, b: 1, a: 1}
   outputPortColor: {r: 1, g: 0.35, b: 0.03, a: 1}
   powerPerActiveOutput: 1
+--- !u!54 &4383126394870898508
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8823847030754594297}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &4414884177395001504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8823847030754594297}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d482d9a37831cd48beaea7fdad3dfca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeattachableComponent
+  rb: {fileID: 4383126394870898508}
+  coll: {fileID: 9004716706175372859}
 --- !u!1 &8965383948772806166
 GameObject:
   m_ObjectHideFlags: 0

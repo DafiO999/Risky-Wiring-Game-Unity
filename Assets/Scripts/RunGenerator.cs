@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using Unity.Cinemachine;
 using UnityEngine;
 
@@ -312,7 +313,7 @@ public sealed class RunGenerator : MonoBehaviour
         foreach (BoardComponent component in components)
         {
             if (component != null)
-                DestroyComponentObject(component);
+                StartCoroutine(DetachBeforeDestroy(component));
         }
     }
 
@@ -1030,7 +1031,7 @@ public sealed class RunGenerator : MonoBehaviour
         foreach (BoardComponent component in generatedComponents)
         {
             if (component != null)
-                DestroyComponentObject(component);
+                StartCoroutine(DetachBeforeDestroy(component));
         }
 
         generatedComponents.Clear();
@@ -1038,10 +1039,19 @@ public sealed class RunGenerator : MonoBehaviour
         foreach (BoardComponent component in inactiveGeneratedComponents)
         {
             if (component != null)
-                DestroyComponentObject(component);
+                StartCoroutine(DetachBeforeDestroy(component));
         }
 
         inactiveGeneratedComponents.Clear();
+    }
+
+    private IEnumerator DetachBeforeDestroy(BoardComponent component)
+    {
+        DeattachableComponent detachble = component.GetComponent<DeattachableComponent>();
+        impulse.GenerateImpulse();
+        detachble.Detach();
+        yield return _waitForSeconds3;
+        DestroyComponentObject(component);
     }
 
     private static void DestroyComponentObject(BoardComponent component)

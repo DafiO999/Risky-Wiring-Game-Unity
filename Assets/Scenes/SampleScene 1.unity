@@ -4815,10 +4815,10 @@ MonoBehaviour:
   - {x: 12, y: 9}
   difficulties: 010000000200000003000000040000000500000006000000070000000800000009000000
   times:
-  - 30
-  - 45
-  - 60
-  - 90
+  - 5
+  - 5
+  - 5
+  - 5
   chaosValues: 01000000030000000500000007000000
   gridSizeResultText: {fileID: 340731736}
   difficultyResultText: {fileID: 1322506446}
@@ -9464,7 +9464,7 @@ MonoBehaviour:
   gambaCamera: {fileID: 1386617336}
   shopCamera: {fileID: 1243413163}
   gameCamera: {fileID: 948781766}
-  waitFor: 2
+  waitFor: 1
 --- !u!4 &1882473377
 Transform:
   m_ObjectHideFlags: 0
