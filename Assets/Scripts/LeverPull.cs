@@ -1,10 +1,16 @@
 using System;
+using System.Collections;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 [DisallowMultipleComponent]
 public sealed class LeverPull : MonoBehaviour
 {
+    private static WaitForSeconds _waitForSeconds5 = new WaitForSeconds(5);
+    [SerializeField]
+    private CinemachineImpulseSource impulse;
+
     [Header("Movement")]
     [SerializeField]
     [Tooltip("Rotation applied around the object's local X axis. Use a negative value to reverse direction.")]
@@ -77,6 +83,7 @@ public sealed class LeverPull : MonoBehaviour
         if (state != LeverState.Idle)
             return;
 
+        impulse.GenerateImpulse();
         state = LeverState.Pulling;
         Pulled?.Invoke();
     }
@@ -121,7 +128,7 @@ public sealed class LeverPull : MonoBehaviour
             targetAngle,
             rotationSpeed * Time.deltaTime);
 
-        transform.localRotation = restingLocalRotation * Quaternion.AngleAxis(currentAngle, Vector3.up);
+        transform.localRotation = restingLocalRotation * Quaternion.AngleAxis(currentAngle, Vector3.forward);
 
         if (!Mathf.Approximately(currentAngle, targetAngle))
             return;
@@ -133,9 +140,15 @@ public sealed class LeverPull : MonoBehaviour
         else
         {
             currentAngle = 0f;
-            state = LeverState.Idle;
+            StartCoroutine(WaitBeforeAllowPull());
             transform.localRotation = restingLocalRotation;
         }
+    }
+
+    private IEnumerator WaitBeforeAllowPull()
+    {
+        yield return _waitForSeconds5;
+        state = LeverState.Idle;
     }
 
     private enum LeverState

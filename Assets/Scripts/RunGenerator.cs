@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Cinemachine;
 using UnityEngine;
 
 [Serializable]
@@ -73,6 +74,9 @@ public sealed class RunGenerator : MonoBehaviour
             RotationSteps = rotationSteps;
         }
     }
+
+    [SerializeField]
+    private CinemachineImpulseSource impulse;
 
     [SerializeField]
     [Tooltip("Display grid that receives the generated run. If empty, the GridBoard on this object is used.")]
@@ -349,6 +353,7 @@ public sealed class RunGenerator : MonoBehaviour
     private IEnumerator DetachCoroutine(BoardComponent component)
     {
         DeattachableComponent detachble = component.GetComponent<DeattachableComponent>();
+        impulse.GenerateImpulse();
         detachble.Detach();
         component.ClearPlacement();
 

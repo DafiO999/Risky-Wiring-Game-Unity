@@ -1,5 +1,6 @@
 using System;
 using TMPro;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -16,6 +17,9 @@ public sealed class SlotChaosResultEvent : UnityEvent<Vector2Int, int, float, in
 [DisallowMultipleComponent]
 public sealed class SlotMachineController : MonoBehaviour
 {
+
+    [SerializeField]
+    private CinemachineImpulseSource impulse;
 
     [SerializeField]
     private ShopController shopController;
@@ -300,6 +304,7 @@ public sealed class SlotMachineController : MonoBehaviour
 
     private void FinishCylinder(int cylinderIndex)
     {
+        impulse.GenerateImpulse();
         currentAngles[cylinderIndex] = 0f;
         cylinders[cylinderIndex].localRotation = originalLocalRotations[cylinderIndex];
         cylinderStopped[cylinderIndex] = true;

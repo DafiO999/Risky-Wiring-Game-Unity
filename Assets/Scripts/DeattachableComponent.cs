@@ -24,7 +24,7 @@ public class DeattachableComponent : MonoBehaviour
 
         coll.isTrigger = true;
 
-        rb.AddForce(transform.up * -2.5f, ForceMode.Impulse);
+        rb.AddForce(transform.up * -3.5f, ForceMode.Impulse);
     }
 
     public void ResetState()
