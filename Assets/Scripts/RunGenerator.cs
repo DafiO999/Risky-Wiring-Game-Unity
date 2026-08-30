@@ -45,7 +45,7 @@ public struct RunComponentCounts
 [RequireComponent(typeof(GridBoard))]
 public sealed class RunGenerator : MonoBehaviour
 {
-    private static WaitForSeconds _waitForSeconds3 = new WaitForSeconds(3);
+    private static WaitForSeconds _waitForSeconds3 = new(3);
     private const int MinimumConsumerCount = 1;
 
     private static readonly Vector2Int[] CardinalCellOffsets =

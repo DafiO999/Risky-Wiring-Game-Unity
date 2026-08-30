@@ -11,6 +11,9 @@ public sealed class LeverPull : MonoBehaviour
     [SerializeField]
     private CinemachineImpulseSource impulse;
 
+    [SerializeField]
+    private Wrench wrench;
+
     [Header("Movement")]
     [SerializeField]
     [Tooltip("Rotation applied around the object's local X axis. Use a negative value to reverse direction.")]
@@ -84,6 +87,7 @@ public sealed class LeverPull : MonoBehaviour
             return;
 
         impulse.GenerateImpulse();
+        wrench.Disableinteraction();
         state = LeverState.Pulling;
         Pulled?.Invoke();
     }

@@ -1,10 +1,11 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 
-public class UpgradeButton : MonoBehaviour, IPointerEnterHandler
+public class UpgradeButton : MonoBehaviour
 {
     [SerializeField]
     private UpgradeId upgradeId;
@@ -19,9 +20,6 @@ public class UpgradeButton : MonoBehaviour, IPointerEnterHandler
     private TextMeshProUGUI levelText;
 
     [SerializeField]
-    private Button upgradeButton;
-
-    [SerializeField]
     private TextMeshProUGUI descText;
 
     [SerializeField]
@@ -33,9 +31,39 @@ public class UpgradeButton : MonoBehaviour, IPointerEnterHandler
     [SerializeField]
     private InteractionHighlight interactionHighlight;
 
+    [SerializeField]
+    private Camera raycastCamera;
+
+    [SerializeField]
+    private LayerMask clickableLayers = Physics.DefaultRaycastLayers;
+
+    [SerializeField, Min(0f)]
+    private float maximumDistance = 1000f;
+
+    [SerializeField]
+    private QueryTriggerInteraction triggerInteraction = QueryTriggerInteraction.UseGlobal;
+
+    [SerializeField]
+    private bool includeChildColliders = true;
+
+    private bool interactable;
+
     private void Start()
     {
         Refresh();
+    }
+
+    private void Update()
+    {
+        Mouse mouse = Mouse.current;
+        bool isIt = IsCursorOverObject(mouse);
+
+        OnHover(isIt);
+
+        if (!interactable || mouse == null || !mouse.leftButton.wasPressedThisFrame)
+            return;
+
+        CheckForClick(isIt);
     }
 
     public void Buy()
@@ -46,6 +74,43 @@ public class UpgradeButton : MonoBehaviour, IPointerEnterHandler
         }
     }
 
+    private void CheckForClick(bool isOverObject)
+    {
+        if (isOverObject)
+            Buy();
+    }
+
+    private void OnHover(bool isHovered)
+    {
+        if (!isHovered) return;
+        descText.text = description;
+        priceText.text = shopController.IsMaxLevel(upgradeId) ? "Max Level" : $"Price: {shopController.GetNextPrice(upgradeId)}";
+    }
+
+    private bool IsCursorOverObject(Mouse mouse)
+    {
+        Camera cameraToUse = raycastCamera != null ? raycastCamera : Camera.main;
+        if (mouse == null || cameraToUse == null)
+            return false;
+
+        Ray ray = cameraToUse.ScreenPointToRay(mouse.position.ReadValue());
+        if (!Physics.Raycast(
+                ray,
+                out RaycastHit hit,
+                maximumDistance,
+                clickableLayers,
+                triggerInteraction))
+        {
+            return false;
+        }
+
+        Transform hitTransform = hit.collider.transform;
+        return hitTransform == transform ||
+               (includeChildColliders && hitTransform.IsChildOf(transform));
+    }
+
+
+
     private void Refresh()
     {
         int level = shopController.GetLevel(upgradeId);
@@ -53,7 +118,7 @@ public class UpgradeButton : MonoBehaviour, IPointerEnterHandler
         if (shopController.IsMaxLevel(upgradeId))
         {
             priceText.text = "Max Level";
-            upgradeButton.interactable = false;
+            interactable = false;   
             highlight.enabled = false;
             interactionHighlight.enabled = false;
         }
@@ -61,15 +126,13 @@ public class UpgradeButton : MonoBehaviour, IPointerEnterHandler
         {
             int nextPrice = shopController.GetNextPrice(upgradeId);
             priceText.text = $"Price: {nextPrice}";
-            upgradeButton.interactable = true;
+            interactable = true;
             highlight.enabled = true;
             interactionHighlight.enabled = true;
         }
     }
 
-    public void OnPointerEnter(PointerEventData eventData)
-    {
-        descText.text = description;
-        priceText.text = shopController.IsMaxLevel(upgradeId) ? "Max Level" : $"Price: {shopController.GetNextPrice(upgradeId)}";
-    }
+
+
+    
 }
