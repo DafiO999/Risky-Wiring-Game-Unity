@@ -379,6 +379,7 @@ GameObject:
   - component: {fileID: 5051334483725347446}
   - component: {fileID: 8193783191470761427}
   - component: {fileID: 6220277231503970585}
+  - component: {fileID: 7267536966466362394}
   m_Layer: 0
   m_Name: portoutput
   m_TagString: Untagged
@@ -458,6 +459,27 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &7267536966466362394
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5571552383912194252}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dab51beb364722c46a48cb5208e021d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Highlight
+  outlineColor: {r: 0.735849, g: 0.08379286, b: 0, a: 1}
+  outlineWidth: 0.1
+  glowIntensity: 20
+  pulse: 1
+  pulseSpeed: 1.01
+  minimumPulseBrightness: 0.35
+  includeChildren: 0
+  visibleThroughWalls: 0
+  highlighted: 1
 --- !u!1 &7052385821185350888
 GameObject:
   m_ObjectHideFlags: 0
@@ -469,6 +491,7 @@ GameObject:
   - component: {fileID: 7679986631066076754}
   - component: {fileID: 6717981633737017847}
   - component: {fileID: 8854050454375415101}
+  - component: {fileID: 1130104606976012021}
   m_Layer: 0
   m_Name: portinput
   m_TagString: Untagged
@@ -548,6 +571,27 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &1130104606976012021
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7052385821185350888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dab51beb364722c46a48cb5208e021d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Highlight
+  outlineColor: {r: 0, g: 0.016151505, b: 0.9528302, a: 1}
+  outlineWidth: 0.1
+  glowIntensity: 20
+  pulse: 1
+  pulseSpeed: 1.01
+  minimumPulseBrightness: 0.35
+  includeChildren: 0
+  visibleThroughWalls: 0
+  highlighted: 1
 --- !u!1 &7139866600608313271
 GameObject:
   m_ObjectHideFlags: 0

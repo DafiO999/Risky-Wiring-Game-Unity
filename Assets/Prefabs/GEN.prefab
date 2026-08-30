@@ -223,6 +223,7 @@ GameObject:
   - component: {fileID: 1463810249803045029}
   - component: {fileID: 2593972504638330624}
   - component: {fileID: 295921966962566090}
+  - component: {fileID: 5896491694229650948}
   m_Layer: 0
   m_Name: portoutput
   m_TagString: Untagged
@@ -302,6 +303,27 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &5896491694229650948
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2241577680869147167}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dab51beb364722c46a48cb5208e021d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Highlight
+  outlineColor: {r: 0.735849, g: 0.08379286, b: 0, a: 1}
+  outlineWidth: 0.1
+  glowIntensity: 20
+  pulse: 1
+  pulseSpeed: 1.01
+  minimumPulseBrightness: 0.35
+  includeChildren: 0
+  visibleThroughWalls: 0
+  highlighted: 1
 --- !u!1 &2737599651831485339
 GameObject:
   m_ObjectHideFlags: 0
@@ -616,6 +638,7 @@ GameObject:
   - component: {fileID: 5701075457445785654}
   - component: {fileID: 6287535004862919376}
   - component: {fileID: 1214933562354846926}
+  - component: {fileID: 6607110227876474886}
   m_Layer: 0
   m_Name: portoutput (1)
   m_TagString: Untagged
@@ -695,6 +718,27 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &6607110227876474886
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8605498793303960706}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dab51beb364722c46a48cb5208e021d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Highlight
+  outlineColor: {r: 0.735849, g: 0.08379286, b: 0, a: 1}
+  outlineWidth: 0.1
+  glowIntensity: 20
+  pulse: 1
+  pulseSpeed: 1.01
+  minimumPulseBrightness: 0.35
+  includeChildren: 0
+  visibleThroughWalls: 0
+  highlighted: 1
 --- !u!1 &8823847030754594297
 GameObject:
   m_ObjectHideFlags: 0
@@ -862,6 +906,7 @@ GameObject:
   - component: {fileID: 8537499780495703500}
   - component: {fileID: 3544039179968068566}
   - component: {fileID: 4904940918137538836}
+  - component: {fileID: 8724547063024908588}
   m_Layer: 0
   m_Name: portoutput (2)
   m_TagString: Untagged
@@ -941,6 +986,27 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &8724547063024908588
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8965383948772806166}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dab51beb364722c46a48cb5208e021d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Highlight
+  outlineColor: {r: 0.735849, g: 0.08379286, b: 0, a: 1}
+  outlineWidth: 0.1
+  glowIntensity: 20
+  pulse: 1
+  pulseSpeed: 1.01
+  minimumPulseBrightness: 0.35
+  includeChildren: 0
+  visibleThroughWalls: 0
+  highlighted: 1
 --- !u!1 &9100000000000001000
 GameObject:
   m_ObjectHideFlags: 0
@@ -1189,6 +1255,7 @@ GameObject:
   - component: {fileID: 5829539205473701628}
   - component: {fileID: 3757385505940876133}
   - component: {fileID: 2933439154833935962}
+  - component: {fileID: 1727358025677828417}
   m_Layer: 0
   m_Name: portoutput (3)
   m_TagString: Untagged
@@ -1268,3 +1335,24 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &1727358025677828417
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9138941556390315024}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dab51beb364722c46a48cb5208e021d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Highlight
+  outlineColor: {r: 0.735849, g: 0.08379286, b: 0, a: 1}
+  outlineWidth: 0.1
+  glowIntensity: 20
+  pulse: 1
+  pulseSpeed: 1.01
+  minimumPulseBrightness: 0.35
+  includeChildren: 0
+  visibleThroughWalls: 0
+  highlighted: 1

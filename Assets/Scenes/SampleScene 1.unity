@@ -4443,11 +4443,11 @@ MonoBehaviour:
   - {x: 12, y: 9}
   difficulties: 010000000200000003000000040000000500000006000000070000000800000009000000
   times:
-  - 15
   - 30
   - 45
   - 60
-  chaosValues: 0300000006000000090000000c000000
+  - 90
+  chaosValues: 01000000030000000600000009000000
   gridSizeResultText: {fileID: 340731736}
   difficultyResultText: {fileID: 1322506446}
   timeResultText: {fileID: 342672975}

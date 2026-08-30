@@ -204,6 +204,8 @@ public sealed class SlotMachineController : MonoBehaviour
                 allStopped = false;
         }
 
+        UpdateResultTexts();
+
         if (allStopped)
             CompleteSpin();
     }
@@ -306,6 +308,16 @@ public sealed class SlotMachineController : MonoBehaviour
     private void CompleteSpin()
     {
         isSpinning = false;
+
+
+        SpinCompleted?.Invoke(GridSize, Difficulty, Time);
+        SpinCompletedWithChaos?.Invoke(GridSize, Difficulty, Time, ChaosValue);
+        onSpinCompleted.Invoke(GridSize, Difficulty, Time);
+        onSpinCompletedWithChaos.Invoke(GridSize, Difficulty, Time, ChaosValue);
+    }
+
+    private void UpdateResultTexts()
+    {
         GridSize = selectedGridSize;
         Difficulty = selectedDifficulty;
         Time = selectedTime;
@@ -315,15 +327,6 @@ public sealed class SlotMachineController : MonoBehaviour
             RunSettings.MaximumChaosValue);
         hasResult = true;
 
-        UpdateResultTexts();
-        SpinCompleted?.Invoke(GridSize, Difficulty, Time);
-        SpinCompletedWithChaos?.Invoke(GridSize, Difficulty, Time, ChaosValue);
-        onSpinCompleted.Invoke(GridSize, Difficulty, Time);
-        onSpinCompletedWithChaos.Invoke(GridSize, Difficulty, Time, ChaosValue);
-    }
-
-    private void UpdateResultTexts()
-    {
         if (gridSizeResultText != null)
             gridSizeResultText.text = $"{GridSize.x}x{GridSize.y}";
 
