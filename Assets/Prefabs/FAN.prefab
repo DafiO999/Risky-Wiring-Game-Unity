@@ -703,6 +703,8 @@ GameObject:
   - component: {fileID: 4849809023471090020}
   - component: {fileID: 14640096874553793}
   - component: {fileID: 8900000000000000002}
+  - component: {fileID: 5609453913272868846}
+  - component: {fileID: 6939710146068988075}
   m_Layer: 0
   m_Name: FAN
   m_TagString: Untagged
@@ -860,6 +862,47 @@ MonoBehaviour:
   underpoweredColor: {r: 1, g: 0.62, b: 0.08, a: 1}
   correctlyPoweredColor: {r: 0.2, g: 1, b: 0.35, a: 1}
   overloadedColor: {r: 1, g: 0.12, b: 0.08, a: 1}
+--- !u!54 &5609453913272868846
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5967161993174259833}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &6939710146068988075
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5967161993174259833}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d482d9a37831cd48beaea7fdad3dfca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeattachableComponent
+  rb: {fileID: 5609453913272868846}
+  coll: {fileID: 0}
 --- !u!1 &6884268374646390794
 GameObject:
   m_ObjectHideFlags: 0

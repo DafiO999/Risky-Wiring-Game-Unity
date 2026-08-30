@@ -73,7 +73,7 @@ public abstract class ScoredPowerConsumerComponent :
     public int ScorePerSecond => receivedPower == requiredPower
         ? 10
         : receivedPower > requiredPower
-            ? -1
+            ? -5
             : 0;
 
     public event Action<int> ReceivedPowerChanged;

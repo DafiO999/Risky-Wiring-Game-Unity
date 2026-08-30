@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -42,6 +43,7 @@ public struct RunComponentCounts
 [RequireComponent(typeof(GridBoard))]
 public sealed class RunGenerator : MonoBehaviour
 {
+    private static WaitForSeconds _waitForSeconds3 = new WaitForSeconds(3);
     private const int MinimumConsumerCount = 1;
 
     private static readonly Vector2Int[] CardinalCellOffsets =
@@ -330,9 +332,7 @@ public sealed class RunGenerator : MonoBehaviour
         generatedComponents.Remove(component);
         if (component is LampComponent or FanComponent)
         {
-            component.gameObject.SetActive(false);
-            component.ClearPlacement();
-            inactiveGeneratedComponents.Add(component);
+            StartCoroutine(DetachCoroutine(component));
         }
         else
         {
@@ -344,6 +344,19 @@ public sealed class RunGenerator : MonoBehaviour
 
         lastGeneratedCounts = CountGeneratedComponents();
         return true;
+    }
+
+    private IEnumerator DetachCoroutine(BoardComponent component)
+    {
+        DeattachableComponent detachble = component.GetComponent<DeattachableComponent>();
+        detachble.Detach();
+        component.ClearPlacement();
+
+        yield return _waitForSeconds3;
+
+        detachble.ResetState();
+        component.gameObject.SetActive(false);
+        inactiveGeneratedComponents.Add(component);
     }
 
     /// <summary>
