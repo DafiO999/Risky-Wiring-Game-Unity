@@ -162,7 +162,7 @@ public sealed class CircuitDebugView : MonoBehaviour
         WireConnection connections = targetBoard.GetWireConnections(cell);
         textBuilder.Append("Wire: ").AppendLine(connections.ToString());
         CircuitNet wireNet = null;
-        bool hasWireNet = connections != WireConnection.None &&
+        bool hasWireNet = targetBoard.HasWire(cell) &&
                           targetCircuit != null &&
                           targetCircuit.TryGetNet(cell, out wireNet);
         textBuilder.Append("NetId: ").AppendLine(

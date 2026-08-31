@@ -11,6 +11,7 @@ public sealed class GridBoard : MonoBehaviour
     private const string DisplayObjectName = "Display";
     private const string ComponentsObjectName = "Components";
     private const string WireViewsObjectName = "WireViews";
+    private const string WirePreviewObjectName = "WirePreview";
     private const string WireViewResourceName = "WireView";
 
     private static readonly WireConnection[] CardinalWireConnections =
@@ -87,6 +88,23 @@ public sealed class GridBoard : MonoBehaviour
     [Tooltip("Height of wire visuals above the board as a fraction of cell size.")]
     private float wireViewHeight = 0.04f;
 
+    [Header("Wire Cursor Visual")]
+    [SerializeField]
+    [Tooltip("Tint used for the center or edge that LMB can place.")]
+    private Color wireGhostColor = new(1f, 0.65f, 0.12f, 0.55f);
+
+    [SerializeField]
+    [Tooltip("Tint used for the exact center or edge that RMB will delete.")]
+    private Color wireDeleteHighlightColor = new(1f, 0.12f, 0.04f, 1f);
+
+    [SerializeField, Range(0.1f, 0.45f)]
+    [Tooltip("Half-size of the center hover area, as a fraction of cell size. The remaining area targets neighboring edges.")]
+    private float wireCenterHoverRadius = 0.25f;
+
+    [SerializeField, Range(0f, 0.1f)]
+    [Tooltip("Raises ghost wire parts above live wires, as a fraction of cell size.")]
+    private float wireGhostHeightOffset = 0.015f;
+
     [Header("Wire Debug")]
     [SerializeField]
     private bool drawWireGizmos = true;
@@ -114,6 +132,10 @@ public sealed class GridBoard : MonoBehaviour
     private bool hasPreviousWireDragCell;
     private Vector2Int previousWireDragCell;
     private readonly Dictionary<Vector2Int, WireView> wireViews = new();
+    private readonly HashSet<WireView> interactionHighlightedWireViews = new();
+    private Transform wirePreviewRoot;
+    private WireView primaryWirePreview;
+    private WireView secondaryWirePreview;
     private GameObject runtimeGridObject;
     private Mesh runtimeGridMesh;
     private MeshRenderer runtimeGridRenderer;
@@ -190,11 +212,14 @@ public sealed class GridBoard : MonoBehaviour
     private void OnDisable()
     {
         ResetWireDrag();
+        ClearWireHoverVisual();
+        DestroyWirePreview();
         DestroyRuntimeGridView();
     }
 
     private void OnDestroy()
     {
+        DestroyWirePreview();
         DestroyRuntimeGridView();
     }
 
@@ -204,6 +229,8 @@ public sealed class GridBoard : MonoBehaviour
         height = Mathf.Max(1, height);
         cellSize = Mathf.Max(0.01f, cellSize);
         wireViewHeight = Mathf.Clamp(wireViewHeight, 0f, 0.25f);
+        wireCenterHoverRadius = Mathf.Clamp(wireCenterHoverRadius, 0.1f, 0.45f);
+        wireGhostHeightOffset = Mathf.Clamp(wireGhostHeightOffset, 0f, 0.1f);
         wireGizmoHeight = Mathf.Clamp(wireGizmoHeight, 0f, 0.25f);
         wireGizmoNodeSize = Mathf.Clamp(wireGizmoNodeSize, 0.01f, 0.2f);
         gameViewGridHeight = Mathf.Clamp(gameViewGridHeight, 0f, 0.1f);
@@ -237,10 +264,14 @@ public sealed class GridBoard : MonoBehaviour
         if (!Application.isPlaying || !WirePlacementEnabled)
         {
             ResetWireDrag();
+            ClearWireHoverVisual();
             return;
         }
 
-        HandleWireInput();
+        Mouse mouse = Mouse.current;
+        bool hasHoverTarget = TryGetWireHoverTarget(mouse, out WireHoverTarget hoverTarget);
+        HandleWireInput(mouse, hasHoverTarget, hoverTarget);
+        UpdateWireHoverVisual(hasHoverTarget, hoverTarget);
     }
 
     /// <summary>
@@ -254,7 +285,10 @@ public sealed class GridBoard : MonoBehaviour
 
         gameplayInputEnabled = enabled;
         if (!gameplayInputEnabled)
+        {
             ResetWireDrag();
+            ClearWireHoverVisual();
+        }
     }
 
     /// <summary>
@@ -416,7 +450,7 @@ public sealed class GridBoard : MonoBehaviour
     }
 
     /// <summary>
-    /// Enumerates cells containing at least one explicit wire connection.
+    /// Enumerates cells containing a placed wire center.
     /// </summary>
     public IEnumerable<Vector2Int> WireCells
     {
@@ -452,7 +486,8 @@ public sealed class GridBoard : MonoBehaviour
 
     public bool HasWire(Vector2Int cell)
     {
-        return GetWireConnections(cell) != WireConnection.None;
+        WireCell wire = GetWire(cell);
+        return wire != null && wire.HasCenter;
     }
 
     /// <summary>
@@ -473,11 +508,67 @@ public sealed class GridBoard : MonoBehaviour
         return IsInside(cell) && GetOccupant(cell) == null;
     }
 
+    public bool TryPlaceWireCenter(Vector2Int cell)
+    {
+        if (!CanPlaceWire(cell) || HasWire(cell))
+            return false;
+
+        EnsureOccupancy();
+        EnsureWireStorage();
+        wires[cell.x, cell.y] ??= new WireCell();
+
+        bool changed = wires[cell.x, cell.y].AddCenter();
+        changed |= AddFacingPortConnections(cell);
+        if (changed)
+            NotifyWireChanged(cell);
+
+        return changed;
+    }
+
+    private bool CanAddWireConnection(Vector2Int from, Vector2Int to)
+    {
+        if (!WireConnectionUtility.TryGetConnection(
+                from,
+                to,
+                out WireConnection fromConnection,
+                out WireConnection toConnection) ||
+            !IsInside(from) ||
+            !IsInside(to))
+        {
+            return false;
+        }
+
+        EnsureOccupancy();
+        EnsureWireStorage();
+
+        BoardComponent fromComponent = occupants[from.x, from.y];
+        BoardComponent toComponent = occupants[to.x, to.y];
+        if (fromComponent != null && toComponent != null)
+            return false;
+
+        if (fromComponent == null && toComponent == null)
+            return true;
+
+        bool componentIsFrom = fromComponent != null;
+        Vector2Int componentCell = componentIsFrom ? from : to;
+        Vector2Int wireCell = componentIsFrom ? to : from;
+        WireConnection componentFacingWire = componentIsFrom
+            ? fromConnection
+            : toConnection;
+
+        return CanPlaceWire(wireCell) &&
+               TryGetPortAtEdge(
+                   componentCell,
+                   componentFacingWire,
+                   out _,
+                   out _);
+    }
+
     /// <summary>
     /// Adds an edge between orthogonally neighboring cells. Wire-to-wire edges
     /// are reciprocal; a wire-to-port edge stores only the wire-side flag.
-    /// New wire cells also connect to any component ports facing them, but
-    /// neighboring wire cells are never joined implicitly.
+    /// Missing endpoint centers are created as part of placing the side. New
+    /// centers also connect to any adjacent component ports.
     /// </summary>
     public bool TryAddWireConnection(Vector2Int from, Vector2Int to)
     {
@@ -542,7 +633,8 @@ public sealed class GridBoard : MonoBehaviour
             }
 
             wires[wireCell.x, wireCell.y] ??= new WireCell();
-            bool wireChanged =
+            bool wireChanged = wires[wireCell.x, wireCell.y].AddCenter();
+            wireChanged |=
                 wires[wireCell.x, wireCell.y].AddConnection(wireFacingComponent);
             wireChanged |= AddFacingPortConnections(wireCell);
             if (wireChanged)
@@ -555,8 +647,10 @@ public sealed class GridBoard : MonoBehaviour
         wires[from.x, from.y] ??= new WireCell();
         wires[to.x, to.y] ??= new WireCell();
 
-        bool fromChanged = wires[from.x, from.y].AddConnection(fromConnection);
-        bool toChanged = wires[to.x, to.y].AddConnection(toConnection);
+        bool fromChanged = wires[from.x, from.y].AddCenter();
+        bool toChanged = wires[to.x, to.y].AddCenter();
+        fromChanged |= wires[from.x, from.y].AddConnection(fromConnection);
+        toChanged |= wires[to.x, to.y].AddConnection(toConnection);
         fromChanged |= AddFacingPortConnections(from);
         toChanged |= AddFacingPortConnections(to);
 
@@ -1008,7 +1102,7 @@ public sealed class GridBoard : MonoBehaviour
             return false;
 
         WireCell wire = wires[wireCell.x, wireCell.y];
-        if (wire == null || !wire.HasConnections)
+        if (wire == null || !wire.HasCenter)
             return false;
 
         bool changed = false;
@@ -1059,13 +1153,13 @@ public sealed class GridBoard : MonoBehaviour
             return false;
 
         WireCell wire = wires[cell.x, cell.y];
-        return wire != null && wire.HasConnections;
+        return wire != null && wire.HasCenter;
     }
 
     private void RemoveEmptyWire(Vector2Int cell)
     {
         WireCell wire = wires[cell.x, cell.y];
-        if (wire != null && !wire.HasConnections)
+        if (wire != null && !wire.HasAnyPart)
             wires[cell.x, cell.y] = null;
     }
 
@@ -1174,7 +1268,9 @@ public sealed class GridBoard : MonoBehaviour
         viewTransform.localPosition = localCenter;
         viewTransform.localRotation = Quaternion.identity;
         viewTransform.localScale = Vector3.one * cellSize;
-        view.SetState(cell, GetWireConnections(cell));
+        if (Application.isPlaying)
+            view.SetPointerInteractionEnabled(false);
+        view.SetState(cell, HasWire(cell), GetWireConnections(cell));
     }
 
     private WireView ResolveWireViewPrefab()
@@ -1373,9 +1469,29 @@ public sealed class GridBoard : MonoBehaviour
         return existing;
     }
 
-    private void HandleWireInput()
+    private void HandleWireInput(
+        Mouse mouse,
+        bool hasHoverTarget,
+        WireHoverTarget hoverTarget)
     {
-        Mouse mouse = Mouse.current;
+        if (mouse == null)
+        {
+            ResetWireDrag();
+            return;
+        }
+
+        if (hasHoverTarget)
+            ApplyWireClick(mouse, hoverTarget);
+
+        // Removal is driven by the precise center/edge hover target every frame.
+        // Do not also run the older cell-transition drag path, which can remove
+        // an edge that the cursor did not directly pass over.
+        if (mouse.rightButton.isPressed)
+        {
+            ResetWireDrag();
+            return;
+        }
+
         WireEditMode requestedMode = GetRequestedWireEditMode(mouse);
 
         if (requestedMode == WireEditMode.None)
@@ -1413,6 +1529,32 @@ public sealed class GridBoard : MonoBehaviour
         previousWireDragCell = currentCell;
     }
 
+    private void ApplyWireClick(Mouse mouse, WireHoverTarget hoverTarget)
+    {
+        if (mouse.rightButton.isPressed)
+        {
+            if (hoverTarget.Type == WireHoverTargetType.Center)
+                ClearWire(hoverTarget.From);
+            else if (hoverTarget.Type == WireHoverTargetType.Edge)
+                TryRemoveWireConnection(hoverTarget.From, hoverTarget.To);
+
+            return;
+        }
+
+        if (mouse.leftButton.wasPressedThisFrame &&
+            hoverTarget.Type == WireHoverTargetType.Center)
+        {
+            TryPlaceWireCenter(hoverTarget.From);
+        }
+        else if (mouse.leftButton.wasPressedThisFrame &&
+                 hoverTarget.Type == WireHoverTargetType.Edge &&
+                 !HasWireEdge(hoverTarget.From, hoverTarget.To) &&
+                 CanAddWireConnection(hoverTarget.From, hoverTarget.To))
+        {
+            TryAddWireConnection(hoverTarget.From, hoverTarget.To);
+        }
+    }
+
     private void ApplyWireDrag(Vector2Int from, Vector2Int to)
     {
         Vector2Int difference = to - from;
@@ -1431,11 +1573,7 @@ public sealed class GridBoard : MonoBehaviour
         for (int index = 0; index < distance; index++)
         {
             Vector2Int segmentEnd = segmentStart + step;
-            bool changed = activeWireEditMode == WireEditMode.Add
-                ? TryAddWireConnection(segmentStart, segmentEnd)
-                : TryRemoveWireConnection(segmentStart, segmentEnd);
-
-            if (activeWireEditMode == WireEditMode.Add && !changed)
+            if (!TryAddWireConnection(segmentStart, segmentEnd))
                 break;
 
             segmentStart = segmentEnd;
@@ -1450,20 +1588,30 @@ public sealed class GridBoard : MonoBehaviour
         if (mouse.leftButton.isPressed)
             return WireEditMode.Add;
 
-        if (mouse.rightButton.isPressed)
-            return WireEditMode.Remove;
-
         return WireEditMode.None;
     }
 
     private bool TryGetWireCellUnderCursor(Mouse mouse, out Vector2Int cell)
+    {
+        if (!TryGetWireWorldPointUnderCursor(mouse, out Vector3 worldPoint))
+        {
+            cell = default;
+            return false;
+        }
+
+        return TryWorldToCell(worldPoint, out cell);
+    }
+
+    private bool TryGetWireWorldPointUnderCursor(
+        Mouse mouse,
+        out Vector3 worldPoint)
     {
         Camera cameraToUse = wirePlacementCamera != null
             ? wirePlacementCamera
             : Camera.main;
         if (mouse == null || cameraToUse == null)
         {
-            cell = default;
+            worldPoint = default;
             return false;
         }
 
@@ -1471,11 +1619,322 @@ public sealed class GridBoard : MonoBehaviour
         Plane boardPlane = new(transform.up, transform.position);
         if (!boardPlane.Raycast(mouseRay, out float distance))
         {
-            cell = default;
+            worldPoint = default;
             return false;
         }
 
-        return TryWorldToCell(mouseRay.GetPoint(distance), out cell);
+        worldPoint = mouseRay.GetPoint(distance);
+        return true;
+    }
+
+    private bool TryGetWireHoverTarget(
+        Mouse mouse,
+        out WireHoverTarget hoverTarget)
+    {
+        hoverTarget = default;
+        if (!TryGetWireWorldPointUnderCursor(mouse, out Vector3 worldPoint))
+            return false;
+
+        Vector3 localPoint = transform.InverseTransformPoint(worldPoint);
+        Vector3 bottomLeft = GetLocalBottomLeft();
+        float gridX = (localPoint.x - bottomLeft.x) / cellSize;
+        float gridY = (localPoint.z - bottomLeft.z) / cellSize;
+        if (gridX < 0f || gridX >= width || gridY < 0f || gridY >= height)
+            return false;
+
+        Vector2Int cell = new(
+            Mathf.FloorToInt(gridX),
+            Mathf.FloorToInt(gridY));
+        float offsetX = gridX - (cell.x + 0.5f);
+        float offsetY = gridY - (cell.y + 0.5f);
+        float absoluteX = Mathf.Abs(offsetX);
+        float absoluteY = Mathf.Abs(offsetY);
+
+        if (absoluteX <= wireCenterHoverRadius &&
+            absoluteY <= wireCenterHoverRadius)
+        {
+            hoverTarget = WireHoverTarget.Center(cell);
+            return true;
+        }
+
+        Vector2Int direction = absoluteX >= absoluteY
+            ? new Vector2Int(offsetX >= 0f ? 1 : -1, 0)
+            : new Vector2Int(0, offsetY >= 0f ? 1 : -1);
+        Vector2Int neighbor = cell + direction;
+        if (IsInside(neighbor))
+        {
+            hoverTarget = WireHoverTarget.Edge(cell, neighbor);
+            return true;
+        }
+
+        // The outer half of a boundary cell has no edge between two centers.
+        hoverTarget = WireHoverTarget.Center(cell);
+        return true;
+    }
+
+    private bool HasWireEdge(Vector2Int from, Vector2Int to)
+    {
+        if (!WireConnectionUtility.TryGetConnection(
+                from,
+                to,
+                out WireConnection fromConnection,
+                out WireConnection toConnection))
+        {
+            return false;
+        }
+
+        WireCell fromWire = GetWire(from);
+        WireCell toWire = GetWire(to);
+        return (fromWire != null && fromWire.HasConnection(fromConnection)) ||
+               (toWire != null && toWire.HasConnection(toConnection));
+    }
+
+    private void UpdateWireHoverVisual(
+        bool hasHoverTarget,
+        WireHoverTarget hoverTarget)
+    {
+        ClearInteractionHighlightVisuals();
+
+        if (!hasHoverTarget)
+        {
+            HideWirePreviews();
+            return;
+        }
+
+        if (hoverTarget.Type == WireHoverTargetType.Center)
+        {
+            if (HasWire(hoverTarget.From))
+            {
+                HideWirePreviews();
+                HighlightWirePart(
+                    hoverTarget.From,
+                    true,
+                    WireConnection.None);
+            }
+            else if (CanPlaceWire(hoverTarget.From))
+            {
+                ShowCenterWirePreview(hoverTarget.From);
+            }
+            else
+            {
+                HideWirePreviews();
+            }
+
+            return;
+        }
+
+        if (hoverTarget.Type != WireHoverTargetType.Edge)
+        {
+            HideWirePreviews();
+            return;
+        }
+
+        if (HasWireEdge(hoverTarget.From, hoverTarget.To))
+        {
+            HideWirePreviews();
+            HighlightWireEdge(hoverTarget.From, hoverTarget.To);
+        }
+        else if (CanAddWireConnection(hoverTarget.From, hoverTarget.To))
+        {
+            ShowWireEdgePreview(hoverTarget.From, hoverTarget.To);
+        }
+        else
+        {
+            HideWirePreviews();
+        }
+    }
+
+    private void HighlightWireEdge(Vector2Int from, Vector2Int to)
+    {
+        if (!WireConnectionUtility.TryGetConnection(
+                from,
+                to,
+                out WireConnection fromConnection,
+                out WireConnection toConnection))
+        {
+            return;
+        }
+
+        WireCell fromWire = GetWire(from);
+        if (fromWire != null && fromWire.HasConnection(fromConnection))
+            HighlightWirePart(from, false, fromConnection);
+
+        WireCell toWire = GetWire(to);
+        if (toWire != null && toWire.HasConnection(toConnection))
+            HighlightWirePart(to, false, toConnection);
+    }
+
+    private void HighlightWirePart(
+        Vector2Int cell,
+        bool highlightCenter,
+        WireConnection highlightedArms)
+    {
+        WireView view = GetWireView(cell);
+        if (view == null)
+            return;
+
+        view.SetPointerInteractionEnabled(false);
+        view.SetInteractionHighlight(
+            highlightCenter,
+            highlightedArms,
+            wireDeleteHighlightColor);
+        interactionHighlightedWireViews.Add(view);
+    }
+
+    private void ClearInteractionHighlightVisuals()
+    {
+        foreach (WireView view in interactionHighlightedWireViews)
+        {
+            if (view != null)
+                view.ClearInteractionHighlight();
+        }
+
+        interactionHighlightedWireViews.Clear();
+    }
+
+    private void ShowCenterWirePreview(Vector2Int cell)
+    {
+        if (!EnsureWirePreviews())
+            return;
+
+        ConfigureWirePreview(
+            primaryWirePreview,
+            cell,
+            true,
+            WireConnection.None);
+        SetWirePreviewVisible(primaryWirePreview, true);
+        SetWirePreviewVisible(secondaryWirePreview, false);
+    }
+
+    private void ShowWireEdgePreview(Vector2Int from, Vector2Int to)
+    {
+        if (!WireConnectionUtility.TryGetConnection(
+                from,
+                to,
+                out WireConnection fromConnection,
+                out WireConnection toConnection) ||
+            !EnsureWirePreviews())
+        {
+            HideWirePreviews();
+            return;
+        }
+
+        bool showFromArm = GetOccupant(from) == null;
+        bool showToArm = GetOccupant(to) == null;
+
+        if (showFromArm)
+        {
+            ConfigureWirePreview(
+                primaryWirePreview,
+                from,
+                false,
+                fromConnection);
+        }
+
+        if (showToArm)
+        {
+            ConfigureWirePreview(
+                secondaryWirePreview,
+                to,
+                false,
+                toConnection);
+        }
+
+        SetWirePreviewVisible(primaryWirePreview, showFromArm);
+        SetWirePreviewVisible(secondaryWirePreview, showToArm);
+    }
+
+    private bool EnsureWirePreviews()
+    {
+        WireView prefab = ResolveWireViewPrefab();
+        if (prefab == null)
+            return false;
+
+        if (wirePreviewRoot == null)
+        {
+            Transform existing = transform.Find(WirePreviewObjectName);
+            if (existing != null)
+            {
+                DestroyRuntimeObject(existing.gameObject);
+            }
+
+            GameObject rootObject = new(WirePreviewObjectName)
+            {
+                hideFlags = HideFlags.HideInHierarchy | HideFlags.DontSave,
+                layer = gameObject.layer
+            };
+            wirePreviewRoot = rootObject.transform;
+            wirePreviewRoot.SetParent(transform, false);
+        }
+
+        if (primaryWirePreview == null)
+            primaryWirePreview = CreateWirePreview(prefab, "Primary Wire Preview");
+
+        if (secondaryWirePreview == null)
+        {
+            secondaryWirePreview = CreateWirePreview(
+                prefab,
+                "Secondary Wire Preview");
+        }
+
+        return primaryWirePreview != null && secondaryWirePreview != null;
+    }
+
+    private WireView CreateWirePreview(WireView prefab, string objectName)
+    {
+        WireView preview = Instantiate(prefab, wirePreviewRoot);
+        preview.name = objectName;
+        preview.gameObject.SetActive(false);
+        return preview;
+    }
+
+    private void ConfigureWirePreview(
+        WireView preview,
+        Vector2Int cell,
+        bool showCenter,
+        WireConnection visibleArms)
+    {
+        if (preview == null)
+            return;
+
+        Vector3 localCenter = GetLocalBottomLeft() + new Vector3(
+            (cell.x + 0.5f) * cellSize,
+            (wireViewHeight + wireGhostHeightOffset) * cellSize,
+            (cell.y + 0.5f) * cellSize);
+        Transform previewTransform = preview.transform;
+        previewTransform.SetParent(wirePreviewRoot, false);
+        previewTransform.localPosition = localCenter;
+        previewTransform.localRotation = Quaternion.identity;
+        previewTransform.localScale = Vector3.one * cellSize;
+        preview.SetPreviewState(showCenter, visibleArms, wireGhostColor);
+    }
+
+    private static void SetWirePreviewVisible(WireView preview, bool visible)
+    {
+        if (preview != null && preview.gameObject.activeSelf != visible)
+            preview.gameObject.SetActive(visible);
+    }
+
+    private void HideWirePreviews()
+    {
+        SetWirePreviewVisible(primaryWirePreview, false);
+        SetWirePreviewVisible(secondaryWirePreview, false);
+    }
+
+    private void ClearWireHoverVisual()
+    {
+        ClearInteractionHighlightVisuals();
+        HideWirePreviews();
+    }
+
+    private void DestroyWirePreview()
+    {
+        DestroyRuntimeObject(wirePreviewRoot != null
+            ? wirePreviewRoot.gameObject
+            : null);
+        wirePreviewRoot = null;
+        primaryWirePreview = null;
+        secondaryWirePreview = null;
     }
 
     private void ResetWireDrag()
@@ -1811,8 +2270,47 @@ public sealed class GridBoard : MonoBehaviour
     private enum WireEditMode
     {
         None,
-        Add,
-        Remove
+        Add
+    }
+
+    private enum WireHoverTargetType
+    {
+        None,
+        Center,
+        Edge
+    }
+
+    private readonly struct WireHoverTarget
+    {
+        public WireHoverTargetType Type { get; }
+        public Vector2Int From { get; }
+        public Vector2Int To { get; }
+
+        private WireHoverTarget(
+            WireHoverTargetType type,
+            Vector2Int from,
+            Vector2Int to)
+        {
+            Type = type;
+            From = from;
+            To = to;
+        }
+
+        public static WireHoverTarget Center(Vector2Int cell)
+        {
+            return new WireHoverTarget(
+                WireHoverTargetType.Center,
+                cell,
+                cell);
+        }
+
+        public static WireHoverTarget Edge(Vector2Int from, Vector2Int to)
+        {
+            return new WireHoverTarget(
+                WireHoverTargetType.Edge,
+                from,
+                to);
+        }
     }
 
     private void OnDrawGizmos()
@@ -1872,7 +2370,7 @@ public sealed class GridBoard : MonoBehaviour
             for (int x = 0; x < width; x++)
             {
                 WireCell wire = wires[x, y];
-                if (wire == null || !wire.HasConnections)
+                if (wire == null || !wire.HasCenter)
                     continue;
 
                 Vector3 center = bottomLeft + new Vector3(

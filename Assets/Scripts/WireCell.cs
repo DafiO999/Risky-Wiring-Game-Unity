@@ -15,18 +15,35 @@ public enum WireConnection
 public sealed class WireCell
 {
     [SerializeField]
+    private bool hasCenter;
+
+    [SerializeField]
     private WireConnection connections;
 
+    public bool HasCenter => hasCenter;
     public WireConnection Connections => connections;
     public bool HasConnections => connections != WireConnection.None;
+    public bool HasAnyPart => hasCenter || HasConnections;
 
     public bool HasConnection(WireConnection connection)
     {
         return (connections & connection) != 0;
     }
 
+    internal bool AddCenter()
+    {
+        if (hasCenter)
+            return false;
+
+        hasCenter = true;
+        return true;
+    }
+
     internal bool AddConnection(WireConnection connection)
     {
+        if (!hasCenter)
+            return false;
+
         WireConnection previous = connections;
         connections |= connection;
         return connections != previous;
