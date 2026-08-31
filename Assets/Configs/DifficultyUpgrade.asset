@@ -15,9 +15,13 @@ MonoBehaviour:
   id: 1
   UpgradeName: Difficulty
   levels:
-  - price: 50
-    value: 3
   - price: 100
-    value: 6
+    value: 1
   - price: 200
-    value: 9
+    value: 2
+  - price: 400
+    value: 3
+  - price: 500
+    value: 4
+  - price: 1000
+    value: 5

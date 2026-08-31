@@ -84,7 +84,7 @@ public class UpgradeButton : MonoBehaviour
     {
         if (!isHovered) return;
         descText.text = description;
-        priceText.text = shopController.IsMaxLevel(upgradeId) ? "Max Level" : $"Price: {shopController.GetNextPrice(upgradeId)}";
+        priceText.text = shopController.IsMaxLevel(upgradeId) ? "Макс." : $"Цена: {shopController.GetNextPrice(upgradeId)}";
     }
 
     private bool IsCursorOverObject(Mouse mouse)
@@ -114,10 +114,10 @@ public class UpgradeButton : MonoBehaviour
     private void Refresh()
     {
         int level = shopController.GetLevel(upgradeId);
-        levelText.text = $"Level: {level}";
+        levelText.text = $"Уровень: {level}";
         if (shopController.IsMaxLevel(upgradeId))
         {
-            priceText.text = "Max Level";
+            priceText.text = "Макс.";
             interactable = false;   
             highlight.enabled = false;
             interactionHighlight.enabled = false;
@@ -125,7 +125,7 @@ public class UpgradeButton : MonoBehaviour
         else
         {
             int nextPrice = shopController.GetNextPrice(upgradeId);
-            priceText.text = $"Price: {nextPrice}";
+            priceText.text = $"Цена: {nextPrice}";
             interactable = true;
             highlight.enabled = true;
             interactionHighlight.enabled = true;

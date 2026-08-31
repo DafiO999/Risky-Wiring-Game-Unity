@@ -15,9 +15,15 @@ MonoBehaviour:
   id: 2
   UpgradeName: Chaos
   levels:
-  - price: 50
+  - price: 250
+    value: 1
+  - price: 250
     value: 2
-  - price: 100
+  - price: 500
     value: 3
-  - price: 200
+  - price: 750
     value: 4
+  - price: 1250
+    value: 5
+  - price: 1500
+    value: 6

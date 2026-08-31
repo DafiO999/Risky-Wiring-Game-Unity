@@ -14,6 +14,11 @@ public class CameraSwitch : MonoBehaviour
     [SerializeField]
     private float waitFor;
 
+    private void Start()
+    {
+        SwitchToGamba(0);
+    }
+
     public void SwitchToShop()
     {
         gambaCamera.Priority = 0;

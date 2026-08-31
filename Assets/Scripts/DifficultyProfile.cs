@@ -96,7 +96,7 @@ public readonly struct DifficultyAmounts
 public sealed class DifficultyProfile
 {
     public const int MinimumDifficulty = 1;
-    public const int MaximumDifficulty = 10;
+    public const int MaximumDifficulty = 5;
 
     [SerializeField]
     private DifficultyLevel[] levels = CreateDefaultLevels();
@@ -160,12 +160,7 @@ public sealed class DifficultyProfile
             Level(1, 1, 1, 1, 2, 2),
             Level(1, 1, 1, 1, 2, 3),
             Level(1, 1, 1, 1, 3, 3),
-            Level(1, 2, 1, 1, 2, 3),
-            Level(2, 2, 1, 1, 2, 3),
-            Level(2, 2, 1, 2, 2, 2),
-            Level(2, 2, 2, 2, 2, 2),
-            Level(2, 3, 1, 1, 2, 2),
-            Level(2, 2, 2, 2, 2, 2)
+            Level(1, 2, 1, 1, 2, 3)
         };
     }
 

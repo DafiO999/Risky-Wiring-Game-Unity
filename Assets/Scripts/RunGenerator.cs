@@ -312,7 +312,7 @@ public sealed class RunGenerator : MonoBehaviour
             componentsRoot.GetComponentsInChildren<BoardComponent>(true);
         foreach (BoardComponent component in components)
         {
-            if (component != null)
+            if (component != null || targetBoard != null)
                 StartCoroutine(DetachBeforeDestroy(component));
         }
     }
