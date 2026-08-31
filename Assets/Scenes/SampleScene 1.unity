@@ -7231,6 +7231,10 @@ MonoBehaviour:
   wireViewPrefab: {fileID: 3419322242394735718, guid: df5ffd245d4fd8249a191334e9540ecd, type: 3}
   wireViewsRoot: {fileID: 0}
   wireViewHeight: 0.04
+  wireGhostColor: {r: 1, g: 0.65, b: 0.12, a: 0.55}
+  wireDeleteHighlightColor: {r: 1, g: 0.12, b: 0.04, a: 1}
+  wireCenterHoverRadius: 0.25
+  wireGhostHeightOffset: 0.015
   drawWireGizmos: 1
   wireColor: {r: 1, g: 0.8, b: 0.1, a: 1}
   wireGizmoHeight: 0.02

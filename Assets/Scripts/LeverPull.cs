@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [DisallowMultipleComponent]
-public sealed class LeverPull : MonoBehaviour
+public sealed class LeverPull : AnimatedRunImaginator
 {
     private static WaitForSeconds _waitForSeconds5 = new WaitForSeconds(5);
     [SerializeField]
